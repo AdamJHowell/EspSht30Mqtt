@@ -12,8 +12,6 @@
 #include <PubSubClient.h>	 // MQTT client by Nick O'Leary: https://github.com/knolleary/pubsubclient
 #include <WiFiUdp.h>			 // Arduino Over-The-Air updates.
 
-#define LED 2
-
 
 char ipAddress[16];									// A character array to hold the IP address.
 char macAddress[18];									// A character array to hold the MAC address, and append a dash and 3 numbers.
@@ -24,6 +22,8 @@ unsigned long lastPrintTime = 0;					// The last time a MQTT publish was perform
 unsigned long lastBrokerConnect = 0;			// The last time a MQTT broker connection was attempted.
 unsigned long brokerCoolDown = 7000;			// How long to wait between MQTT broker connection attempts.
 unsigned long wifiConnectionTimeout = 15000; // The amount of time to wait for a Wi-Fi connection.
+unsigned long ledBlinkInterval = 200;			// The interval between telemetry processing times.
+unsigned long lastLedBlinkTime = 0;				// The time of the last telemetry process.
 const unsigned int MCU_LED = 2;					// The GPIO which the onboard LED is connected to.
 //const char *hostname = "AdamsEsp32Fleet";					  // The hostname.  Defined in privateInfo.h
 const char *tempCTopic = "AdamsSensors/sht30/tempC";		  // The MQTT Celsius temperature topic.
@@ -98,6 +98,18 @@ float averageArray( float valueArray[] )
 	}
 	return tempValue / arraySize;
 } // End of the averageArray() function.
+
+/**
+ * @brief toggleLED() will change the state of the LED.
+ * This function does not manage any timings.
+ */
+void toggleLED()
+{
+	if( digitalRead( MCU_LED ) != 1 )
+		digitalWrite( MCU_LED, 1 );
+	else
+		digitalWrite( MCU_LED, 0 );
+} // End of toggleLED() function.
 
 /**
  * @brief lookupWifiCode() will return the string for an integer code.
@@ -286,13 +298,13 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 	Serial.println( message );
 	String str_msg = String( message );
 	if( str_msg.equals( "ON" ) )
-		digitalWrite( LED, HIGH );
+		digitalWrite( MCU_LED, HIGH );
 	else if( str_msg.equals( "on" ) )
-		digitalWrite( LED, HIGH );
+		digitalWrite( MCU_LED, HIGH );
 	else if( str_msg.equals( "OFF" ) )
-		digitalWrite( LED, LOW );
+		digitalWrite( MCU_LED, LOW );
 	else if( str_msg.equals( "off" ) )
-		digitalWrite( LED, LOW );
+		digitalWrite( MCU_LED, LOW );
 	else
 		Serial.printf( "Unknown command '%s'\n", message );
 } // End of the mqttCallback() function.
@@ -307,7 +319,7 @@ void mqttConnect()
 	if( lastBrokerConnect == 0 || ( time > brokerCoolDown && ( time - brokerCoolDown ) > lastBrokerConnect ) )
 	{
 		lastBrokerConnect = millis();
-		digitalWrite( LED, LOW );
+		digitalWrite( MCU_LED, LOW );
 		Serial.printf( "Connecting to broker at %s:%d...\n", broker, port );
 		mqttClient.setServer( broker, port );
 		mqttClient.setCallback( mqttCallback );
@@ -326,7 +338,7 @@ void mqttConnect()
 		}
 
 		mqttClient.subscribe( "led1" );
-		digitalWrite( LED, HIGH );
+		digitalWrite( MCU_LED, HIGH );
 	}
 } // End of the mqttConnect() function.
 
@@ -371,9 +383,9 @@ void loop()
 	else
 		mqttClient.loop();
 
-	long time = millis();
-	// Print the first time.  Avoid subtraction overflow.  Print every interval.
-	if( lastPrintTime == 0 || ( time > printInterval && ( time - printInterval ) > lastPrintTime ) )
+	long currentTime = millis();
+	// Print the first currentTime.  Avoid subtraction overflow.  Print every interval.
+	if( lastPrintTime == 0 || ( currentTime > printInterval && ( currentTime - printInterval ) > lastPrintTime ) )
 	{
 		readTelemetry();
 		printTelemetry();
@@ -382,5 +394,23 @@ void loop()
 		lastPrintTime = millis();
 
 		Serial.printf( "Next print in %u seconds.\n\n", printInterval / 1000 );
+	}
+
+	currentTime = millis();
+	// Process the first currentTime.  Avoid subtraction overflow.  Process every interval.
+	if( lastLedBlinkTime == 0 || ( ( currentTime > ledBlinkInterval ) && ( currentTime - ledBlinkInterval ) > lastLedBlinkTime ) )
+	{
+		lastLedBlinkTime = millis();
+
+		// If Wi-Fi is connected, but MQTT is not, blink the LED.
+		if( WiFi.status() == WL_CONNECTED )
+		{
+			if( mqttClient.state() != 0 )
+				toggleLED();
+			else
+				digitalWrite( MCU_LED, 0 ); // Turn the LED on to show both Wi-Fi and MQTT are connected.
+		}
+		else
+			digitalWrite( MCU_LED, 1 ); // Turn the LED off to show that Wi-Fi is not connected.
 	}
 } // End of the loop() function.
