@@ -458,9 +458,9 @@ void loop()
 			if( mqttClient.state() != 0 )
 				toggleLED();
 			else
-				digitalWrite( MCU_LED, 0 ); // Turn the LED on to show both Wi-Fi and MQTT are connected.
+				digitalWrite( MCU_LED, 1 ); // Turn the LED on to show both Wi-Fi and MQTT are connected.
 		}
 		else
-			digitalWrite( MCU_LED, 1 ); // Turn the LED off to show that Wi-Fi is not connected.
+			digitalWrite( MCU_LED, 0 ); // Turn the LED off to show that Wi-Fi is not connected.
 	}
 } // End of the loop() function.
