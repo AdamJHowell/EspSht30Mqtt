@@ -344,6 +344,8 @@ void publishTelemetry()
 
 /**
  * @brief mqttCallback() will process incoming messages on subscribed topics.
+ * { "command": "publishTelemetry" }
+ * { "command": "changeTelemetryInterval", "value": 10000 }
  * ToDo: Add more commands for the board to react to.
  */
 void mqttCallback( char *topic, byte *payload, unsigned int length )
@@ -351,9 +353,12 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 	Serial.printf( "\nMessage arrived on Topic: '%s'\n", topic );
 
 	StaticJsonDocument<JSON_DOC_SIZE> callbackJsonDoc;
+	Serial.println( "JSON document (static) was created." );
 	deserializeJson( callbackJsonDoc, payload, length );
+	Serial.println( "JSON document was deserialized." );
 
 	const char *command = callbackJsonDoc["command"];
+	Serial.printf( "Processing command '%s'.\n", command );
 	if( strcmp( command, "publishTelemetry" ) == 0 )
 	{
 		Serial.println( "Reading and publishing sensor values." );
@@ -365,13 +370,11 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 	}
 	else if( strcmp( command, "changeTelemetryInterval" ) == 0 )
 	{
-		Serial.println( "Changing the publish interval." );
 		unsigned long tempValue = callbackJsonDoc["value"];
 		// Only update the value if it is greater than 4 seconds.  This prevents a seconds vs. milliseconds confusion.
 		if( tempValue > 4000 )
 			publishInterval = tempValue;
-		Serial.print( "MQTT publish interval has been updated to " );
-		Serial.println( publishInterval );
+		Serial.printf( "MQTT publish interval has been updated to %u\n", publishInterval );
 		lastPublishTime = 0;
 	}
 	else if( strcmp( command, "publishStatus" ) == 0 )
@@ -398,7 +401,7 @@ void mqttConnect()
 
 		// Connect to the broker, using the MAC address for a MQTT client ID.
 		if( mqttClient.connect( macAddress ) )
-			Serial.print( "Connected to MQTT Broker.\n" );
+			Serial.println( "Connected to MQTT Broker." );
 		else
 		{
 			int mqttStateCode = mqttClient.state();
