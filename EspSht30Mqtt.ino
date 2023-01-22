@@ -13,32 +13,39 @@
 #include <WiFiUdp.h>			 // Arduino Over-The-Air updates.
 
 
-char ipAddress[16];									// A character array to hold the IP address.
-char macAddress[18];									// A character array to hold the MAC address, and append a dash and 3 numbers.
-long rssi;												// A global to hold the Received Signal Strength Indicator.
-unsigned int printInterval = 15000;				// How long to wait between stat printouts.
-unsigned long printCount = 0;						// A counter of how many times the stats have been published.
-unsigned long lastPrintTime = 0;					// The last time a MQTT publish was performed.
-unsigned long lastBrokerConnect = 0;			// The last time a MQTT broker connection was attempted.
-unsigned long brokerCoolDown = 7000;			// How long to wait between MQTT broker connection attempts.
-unsigned long wifiConnectionTimeout = 15000; // The amount of time to wait for a Wi-Fi connection.
-unsigned long ledBlinkInterval = 200;			// The interval between telemetry processing times.
-unsigned long lastLedBlinkTime = 0;				// The time of the last telemetry process.
-const unsigned int MCU_LED = 2;					// The GPIO which the onboard LED is connected to.
-//const char *hostname = "AdamsEsp32Fleet";					  // The hostname.  Defined in privateInfo.h
-const char *tempCTopic = "AdamsSensors/sht30/tempC";		  // The MQTT Celsius temperature topic.
-const char *tempFTopic = "AdamsSensors/sht30/tempF";		  // The MQTT Fahrenheit temperature topic.
-const char *humidityTopic = "AdamsSensors/sht30/humidity"; // The MQTT humidity topic.
-const char *rssiTopic = "AdamsSensors/rssi";					  // The RSSI topic.
-const char *macTopic = "AdamsSensors/mac";					  // The MAC address topic.
-const char *ipTopic = "AdamsSensors/ip";						  // The IP address topic.
-bool enableHeater = false;											  // The status of the SHT30 heating element.
-float sht30TempCArray[] = { 21.12, 21.12, 21.12 };			  // An array to hold the 3 most recent Celsius values.
-float sht30HumidityArray[] = { 21.12, 21.12, 21.12 };		  // An array to hold the 3 most recent values.
+char ipAddress[16];												// A character array to hold the IP address.
+char macAddress[18];												// A character array to hold the MAC address, and append a dash and 3 numbers.
+long rssi;															// A global to hold the Received Signal Strength Indicator.
+unsigned int printInterval = 15000;							// How long to wait between telemetry printouts.
+unsigned int publishInterval = 60000;						// How long to wait between telemetry publishes.
+unsigned int wifiConnectCount = 0;							// A counter for how many times the wifiConnect() function has been called.
+unsigned int mqttConnectCount = 0;							// A counter for how many times the mqttConnect() function has been called.
+unsigned long printCount = 0;									// A counter of how many times the stats have been printed.
+unsigned long publishCount = 0;								// A counter of how many times the stats have been published.
+unsigned long lastPrintTime = 0;								// The last time telemetry was printed.
+unsigned long lastPublishTime = 0;							// The last time a MQTT publish was performed.
+unsigned long lastBrokerConnect = 0;						// The last time a MQTT broker connection was attempted.
+unsigned long brokerCoolDown = 7000;						// How long to wait between MQTT broker connection attempts.
+unsigned long wifiConnectionTimeout = 15000;				// The amount of time to wait for a Wi-Fi connection.
+unsigned long ledBlinkInterval = 200;						// The interval between telemetry processing times.
+unsigned long lastLedBlinkTime = 0;							// The time of the last telemetry process.
+const unsigned int MCU_LED = 2;								// The GPIO which the onboard LED is connected to.
+const char *topicPrefix = "AdamsEspArmada/";				// The MQTT topic prefix, which will have suffixes appended to.
+const char *tempCTopic = "sht30/tempC";					// The MQTT Celsius temperature topic suffix.
+const char *tempFTopic = "sht30/tempF";					// The MQTT Fahrenheit temperature topic suffix.
+const char *humidityTopic = "sht30/humidity";			// The MQTT humidity topic suffix.
+const char *rssiTopic = "rssi";								// The RSSI topic suffix.
+const char *macTopic = "mac";									// The MAC address topic suffix.
+const char *ipTopic = "ip";									// The IP address topic suffix.
+const char *wifiCountTopic = "wifiCount";					// The Wi-Fi count topic suffix.
+const char *mqttCountTopic = "mqttCount";					// The MQTT count topic suffix.
+const char *publishCountTopic = "publishCount";			// The publishCount topic suffix.
+float sht30TempCArray[] = { 21.12, 21.12, 21.12 };		// An array to hold the 3 most recent Celsius values.
+float sht30HumidityArray[] = { 21.12, 21.12, 21.12 }; // An array to hold the 3 most recent values.
 //const char *wifiSsid = "nunya";											// Wi-Fi SSID.  Defined in privateInfo.h
 //const char *wifiPassword = "nunya";										// Wi-Fi password.  Defined in privateInfo.h
 //const char *broker = "nunya";												// The broker address.  Defined in privateInfo.h
-//const unsigned int port = 1883;											// The broker port.
+//const unsigned int port = 1883;											// The broker port.  Defined in privateInfo.h
 
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
@@ -55,7 +62,8 @@ void setupSht30()
 	if( !sht31.begin( address ) )
 	{
 		Serial.printf( "Could not find SHT30 at address %X!\n", address );
-		Serial.println( "  Please check the wiring and try again." );
+		Serial.println( "  Please fix the problem and reboot the device." );
+		Serial.println( "  This function is now in an infinite loop." );
 		while( 1 )
 			delay( 1 );
 	}
@@ -187,17 +195,19 @@ void lookupMQTTCode( int code, char *buffer )
 } // End of the lookupMQTTCode() function.
 
 /**
- * @brief wifiBasicConnect() will connect to a SSID.
+ * @brief wifiConnect() will connect to a SSID.
  */
-void wifiBasicConnect()
+void wifiConnect()
 {
+	wifiConnectCount++;
 	// Turn the LED off to show Wi-Fi is not connected.
 	digitalWrite( MCU_LED, LOW );
 
 	Serial.printf( "Attempting to connect to Wi-Fi SSID '%s'", wifiSsid );
 	WiFi.mode( WIFI_STA );
 	WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
-	WiFi.setHostname( hostname );
+	const char *hostName = macAddress;
+	WiFi.setHostname( hostName );
 	WiFi.begin( wifiSsid, wifiPassword );
 
 	unsigned long wifiConnectionStartTime = millis();
@@ -221,7 +231,7 @@ void wifiBasicConnect()
 	}
 	else
 		Serial.println( "Wi-Fi failed to connect in the timeout period.\n" );
-} // End of the wifiBasicConnect() function.
+} // End of the wifiConnect() function.
 
 /**
  * @brief readTelemetry() will read the telemetry and save values to global variables.
@@ -246,6 +256,7 @@ void printTelemetry()
 	int wifiStatusCode = WiFi.status();
 	char buffer[29];
 	lookupWifiCode( wifiStatusCode, buffer );
+	Serial.printf( "wifiConnectCount: %u\n", wifiConnectCount );
 	Serial.printf( "Wi-Fi status text: %s\n", buffer );
 	Serial.printf( "Wi-Fi status code: %d\n", wifiStatusCode );
 	if( wifiStatusCode == 3 )
@@ -253,6 +264,7 @@ void printTelemetry()
 		Serial.printf( "IP address: %s\n", ipAddress );
 		Serial.printf( "RSSI: %ld\n", rssi );
 	}
+	Serial.printf( "mqttConnectCount: %u\n", mqttConnectCount );
 	Serial.printf( "Broker: %s:%d\n", broker, port );
 	int mqttStateCode = mqttClient.state();
 	lookupMQTTCode( mqttStateCode, buffer );
@@ -267,19 +279,45 @@ void printTelemetry()
  */
 void publishTelemetry()
 {
-	char buffer[25] = "";
-	snprintf( buffer, 25, "%f", averageArray( sht30TempCArray ) );
-	Serial.printf( "Publishing '%s' to '%s'\n", buffer, tempCTopic );
-	mqttClient.publish( tempCTopic, buffer );
-	snprintf( buffer, 25, "%f", cToF( averageArray( sht30TempCArray ) ) );
-	Serial.printf( "Publishing '%s' to '%s'\n", buffer, tempFTopic );
-	mqttClient.publish( tempFTopic, buffer );
-	snprintf( buffer, 25, "%f", averageArray( sht30HumidityArray ) );
-	Serial.printf( "Publishing '%s' to '%s'\n", buffer, humidityTopic );
-	mqttClient.publish( humidityTopic, buffer );
-	snprintf( buffer, 25, "%ld", rssi );
-	Serial.printf( "Publishing '%s' to '%s'\n", buffer, rssiTopic );
-	mqttClient.publish( rssiTopic, buffer );
+	publishCount++;
+	char topicBuffer[256] = "";
+	char valueBuffer[25] = "";
+	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", tempCTopic );
+	snprintf( valueBuffer, 25, "%f", averageArray( sht30TempCArray ) );
+	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
+	mqttClient.publish( topicBuffer, valueBuffer );
+	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", tempFTopic );
+	snprintf( valueBuffer, 25, "%f", cToF( averageArray( sht30TempCArray ) ) );
+	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
+	mqttClient.publish( topicBuffer, valueBuffer );
+	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", humidityTopic );
+	snprintf( valueBuffer, 25, "%f", averageArray( sht30HumidityArray ) );
+	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
+	mqttClient.publish( topicBuffer, valueBuffer );
+	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", rssiTopic );
+	snprintf( valueBuffer, 25, "%ld", rssi );
+	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
+	mqttClient.publish( topicBuffer, valueBuffer );
+	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", macTopic );
+	snprintf( valueBuffer, 25, "%s", macAddress );
+	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
+	mqttClient.publish( topicBuffer, valueBuffer );
+	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", ipTopic );
+	snprintf( valueBuffer, 25, "%s", ipAddress );
+	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
+	mqttClient.publish( topicBuffer, valueBuffer );
+	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCountTopic );
+	snprintf( valueBuffer, 25, "%u", wifiConnectCount );
+	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
+	mqttClient.publish( topicBuffer, valueBuffer );
+	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCountTopic );
+	snprintf( valueBuffer, 25, "%u", mqttConnectCount );
+	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
+	mqttClient.publish( topicBuffer, valueBuffer );
+	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", publishCountTopic );
+	snprintf( valueBuffer, 25, "%lu", publishCount );
+	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
+	mqttClient.publish( topicBuffer, valueBuffer );
 } // End of the printTelemetry() function.
 
 /**
@@ -314,6 +352,7 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
  */
 void mqttConnect()
 {
+	mqttConnectCount++;
 	long time = millis();
 	// Connect the first time.  Avoid subtraction overflow.  Connect after cool down.
 	if( lastBrokerConnect == 0 || ( time > brokerCoolDown && ( time - brokerCoolDown ) > lastBrokerConnect ) )
@@ -376,28 +415,38 @@ void setup()
  */
 void loop()
 {
+	// Reconnect Wi-Fi if needed, reconnect MQTT if needed, and process MQTT tasks.
 	if( WiFi.status() != WL_CONNECTED )
-		wifiBasicConnect();
+		wifiConnect();
 	else if( !mqttClient.connected() )
 		mqttConnect();
 	else
 		mqttClient.loop();
 
 	long currentTime = millis();
-	// Print the first currentTime.  Avoid subtraction overflow.  Print every interval.
+	// Print the first time.  Avoid subtraction overflow.  Print every interval.
 	if( lastPrintTime == 0 || ( currentTime > printInterval && ( currentTime - printInterval ) > lastPrintTime ) )
 	{
 		readTelemetry();
 		printTelemetry();
-		if( mqttClient.connected() )
-			publishTelemetry();
 		lastPrintTime = millis();
 
 		Serial.printf( "Next print in %u seconds.\n\n", printInterval / 1000 );
 	}
 
 	currentTime = millis();
-	// Process the first currentTime.  Avoid subtraction overflow.  Process every interval.
+	// Publish the first currentTime.  Avoid subtraction overflow.  Publish every interval.
+	if( lastPublishTime == 0 || ( currentTime > publishInterval && ( currentTime - publishInterval ) > lastPublishTime ) )
+	{
+		publishCount++;
+		readTelemetry();
+		printTelemetry();
+		if( mqttClient.connected() )
+			publishTelemetry();
+	}
+
+	currentTime = millis();
+	// Process the first time.  Avoid subtraction overflow.  Process every interval.
 	if( lastLedBlinkTime == 0 || ( ( currentTime > ledBlinkInterval ) && ( currentTime - ledBlinkInterval ) > lastLedBlinkTime ) )
 	{
 		lastLedBlinkTime = millis();
