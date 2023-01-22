@@ -26,7 +26,8 @@ unsigned long brokerCoolDown = 7000;			// How long to wait between MQTT broker c
 unsigned long wifiConnectionTimeout = 15000; // The amount of time to wait for a Wi-Fi connection.
 const unsigned int MCU_LED = 2;					// The GPIO which the onboard LED is connected to.
 //const char *hostname = "AdamsEsp32Fleet";					  // The hostname.  Defined in privateInfo.h
-const char *tempTopic = "AdamsSensors/sht30/tempC";		  // The MQTT humidity topic.
+const char *tempCTopic = "AdamsSensors/sht30/tempC";		  // The MQTT Celsius temperature topic.
+const char *tempFTopic = "AdamsSensors/sht30/tempF";		  // The MQTT Fahrenheit temperature topic.
 const char *humidityTopic = "AdamsSensors/sht30/humidity"; // The MQTT humidity topic.
 const char *rssiTopic = "AdamsSensors/rssi";					  // The RSSI topic.
 const char *macTopic = "AdamsSensors/mac";					  // The MAC address topic.
@@ -65,6 +66,14 @@ void setupSht30()
 	else
 		Serial.println( "DISABLED" );
 } // End of the setupSht30() function.
+
+/**
+ * @brief cToF() will convert Celsius to Fahrenheit.
+ */
+float cToF( float value )
+{
+	return value * 1.8 + 32;
+} // End of the cToF() function.
 
 /**
  * @brief addValue() will add the passed value to the passed array, after moving the existing array values to higher indexes.
@@ -237,6 +246,7 @@ void printTelemetry()
 	lookupMQTTCode( mqttStateCode, buffer );
 	Serial.printf( "MQTT state: %s\n", buffer );
 	Serial.printf( "SHT30 tempC: %f\n", averageArray( sht30TempCArray ) );
+	Serial.printf( "SHT30 tempF: %f\n", cToF( averageArray( sht30TempCArray ) ) );
 	Serial.printf( "SHT30 humidity: %f\n", averageArray( sht30HumidityArray ) );
 } // End of the printTelemetry() function.
 
@@ -247,14 +257,17 @@ void publishTelemetry()
 {
 	char buffer[25] = "";
 	snprintf( buffer, 25, "%f", averageArray( sht30TempCArray ) );
-	Serial.printf( "Publishing '%s' to '%s'\n", buffer, tempTopic );
-	mqttClient.publish( tempTopic, buffer );
+	Serial.printf( "Publishing '%s' to '%s'\n", buffer, tempCTopic );
+	mqttClient.publish( tempCTopic, buffer );
+	snprintf( buffer, 25, "%f", cToF( averageArray( sht30TempCArray ) ) );
+	Serial.printf( "Publishing '%s' to '%s'\n", buffer, tempFTopic );
+	mqttClient.publish( tempFTopic, buffer );
 	snprintf( buffer, 25, "%f", averageArray( sht30HumidityArray ) );
 	Serial.printf( "Publishing '%s' to '%s'\n", buffer, humidityTopic );
 	mqttClient.publish( humidityTopic, buffer );
-	snprintf( buffer, 25, "%d", rssi );
+	snprintf( buffer, 25, "%ld", rssi );
 	Serial.printf( "Publishing '%s' to '%s'\n", buffer, rssiTopic );
-	mqttClient.publish( humidityTopic, buffer );
+	mqttClient.publish( rssiTopic, buffer );
 } // End of the printTelemetry() function.
 
 /**
@@ -364,7 +377,8 @@ void loop()
 	{
 		readTelemetry();
 		printTelemetry();
-		publishTelemetry();
+		if( mqttClient.connected() )
+			publishTelemetry();
 		lastPrintTime = millis();
 
 		Serial.printf( "Next print in %u seconds.\n\n", printInterval / 1000 );
