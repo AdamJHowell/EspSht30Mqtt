@@ -436,14 +436,11 @@ void loop()
 	}
 
 	currentTime = millis();
-	// Publish the first currentTime.  Avoid subtraction overflow.  Publish every interval.
-	if( lastPublishTime == 0 || ( currentTime > publishInterval && ( currentTime - publishInterval ) > lastPublishTime ) )
+	// Publish only if connected.  Publish the first time.  Avoid subtraction overflow.  Publish every interval.
+	if( mqttClient.connected() && ( lastPublishTime == 0 || ( currentTime > publishInterval && ( currentTime - publishInterval ) > lastPublishTime ) ) )
 	{
 		publishCount++;
-		readTelemetry();
-		printTelemetry();
-		if( mqttClient.connected() )
-			publishTelemetry();
+		publishTelemetry();
 		lastPublishTime = millis();
 
 		Serial.printf( "Next publish in %u seconds.\n\n", publishInterval / 1000 );
