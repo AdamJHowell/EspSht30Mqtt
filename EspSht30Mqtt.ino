@@ -236,6 +236,65 @@ void wifiConnect()
 		Serial.println( "Wi-Fi failed to connect in the timeout period.\n" );
 } // End of the wifiConnect() function.
 
+
+/**
+ * @brief configureOTA() will configure and initiate Over The Air (OTA) updates for this device.
+ */
+void configureOTA()
+{
+	Serial.println( "Configuring OTA." );
+
+#ifdef ESP8266
+	// The ESP8266 port defaults to 8266
+	// ArduinoOTA.setPort( 8266 );
+	// The ESP8266 hostname defaults to esp8266-[ChipID]
+	ArduinoOTA.setHostname( hostName );
+	// Authentication is disabled by default.
+	// ArduinoOTA.setPassword( ( const char * )"admin" );
+#else
+	// The ESP32 port defaults to 3232
+	// ArduinoOTA.setPort( 3232 );
+	// The ESP32 hostname defaults to esp32-[MAC]
+//	ArduinoOTA.setHostname( hostName );  // I'm deliberately using the default.
+	// Authentication is disabled by default.
+	// ArduinoOTA.setPassword( "admin" );
+	// Password can be set with it's md5 value as well
+	// MD5( admin ) = 21232f297a57a5a743894a0e4a801fc3
+	// ArduinoOTA.setPasswordHash( "21232f297a57a5a743894a0e4a801fc3" );
+#endif
+
+//	Serial.printf( "Using hostname '%s'\n", hostName );
+
+	String type = "filesystem";	// SPIFFS
+	if( ArduinoOTA.getCommand() == U_FLASH )
+		type = "sketch";
+
+	// Configure the OTA callbacks.
+	ArduinoOTA.onStart( []()
+							  {
+								  String type = "flash";	// U_FLASH
+								  if( ArduinoOTA.getCommand() == U_SPIFFS )
+									  type = "filesystem";
+								  // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+								  Serial.print( "OTA is updating the " );
+								  Serial.println( type );
+							  } );
+	ArduinoOTA.onEnd( []() { Serial.println( "\nTerminating OTA communication." ); } );
+	ArduinoOTA.onProgress( []( unsigned int progress, unsigned int total ){ Serial.printf( "OTA progress: %u%%\r", ( progress / ( total / 100 ) ) ); } );
+	ArduinoOTA.onError( []( ota_error_t error ){
+		Serial.printf( "Error[%u]: ", error );
+		if( error == OTA_AUTH_ERROR ) Serial.println( "OTA authentication failed!" );
+		else if( error == OTA_BEGIN_ERROR ) Serial.println( "OTA transmission failed to initiate properly!" );
+		else if( error == OTA_CONNECT_ERROR ) Serial.println( "OTA connection failed!" );
+		else if( error == OTA_RECEIVE_ERROR ) Serial.println( "OTA client was unable to properly receive data!" );
+		else if( error == OTA_END_ERROR ) Serial.println( "OTA transmission failed to terminate properly!" ); } );
+
+	// Start listening for OTA commands.
+	ArduinoOTA.begin();
+
+	Serial.println( "OTA is configured and ready." );
+} // End of the configureOTA() function.
+
 /**
  * @brief readTelemetry() will read the telemetry and save values to global variables.
  */
@@ -442,6 +501,9 @@ void setup()
 	// Read from the sensors twice, to populate their arrays.
 	readTelemetry();
 	readTelemetry();
+
+	wifiConnect();
+	configureOTA();
 
 	Serial.println( "Function setup() has completed." );
 } // End of the setup() function.
