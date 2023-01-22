@@ -282,39 +282,39 @@ void publishTelemetry()
 	publishCount++;
 	char topicBuffer[256] = "";
 	char valueBuffer[25] = "";
-	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", tempCTopic );
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", tempCTopic );
 	snprintf( valueBuffer, 25, "%f", averageArray( sht30TempCArray ) );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
-	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", tempFTopic );
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", tempFTopic );
 	snprintf( valueBuffer, 25, "%f", cToF( averageArray( sht30TempCArray ) ) );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
-	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", humidityTopic );
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", humidityTopic );
 	snprintf( valueBuffer, 25, "%f", averageArray( sht30HumidityArray ) );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
-	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", rssiTopic );
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", rssiTopic );
 	snprintf( valueBuffer, 25, "%ld", rssi );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
-	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", macTopic );
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", macTopic );
 	snprintf( valueBuffer, 25, "%s", macAddress );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
-	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", ipTopic );
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", ipTopic );
 	snprintf( valueBuffer, 25, "%s", ipAddress );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
-	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCountTopic );
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCountTopic );
 	snprintf( valueBuffer, 25, "%u", wifiConnectCount );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
-	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCountTopic );
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCountTopic );
 	snprintf( valueBuffer, 25, "%u", mqttConnectCount );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
-	snprintf( topicBuffer, 25, "%s%s%s%s", topicPrefix, macAddress, "/", publishCountTopic );
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", publishCountTopic );
 	snprintf( valueBuffer, 25, "%lu", publishCount );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
@@ -443,6 +443,7 @@ void loop()
 		printTelemetry();
 		if( mqttClient.connected() )
 			publishTelemetry();
+		lastPublishTime = millis();
 	}
 
 	currentTime = millis();
