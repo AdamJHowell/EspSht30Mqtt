@@ -201,7 +201,7 @@ void wifiConnect()
 {
 	wifiConnectCount++;
 	// Turn the LED off to show Wi-Fi is not connected.
-	digitalWrite( MCU_LED, LOW );
+	digitalWrite( MCU_LED, 0 );
 
 	Serial.printf( "Attempting to connect to Wi-Fi SSID '%s'", wifiSsid );
 	WiFi.mode( WIFI_STA );
@@ -226,7 +226,7 @@ void wifiConnect()
 		Serial.println( "\nWi-Fi connection established!" );
 		snprintf( ipAddress, 16, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3] );
 		// Turn the LED on to show that Wi-Fi is connected.
-		digitalWrite( MCU_LED, HIGH );
+		digitalWrite( MCU_LED, 1 );
 		return;
 	}
 	else
@@ -322,6 +322,7 @@ void publishTelemetry()
 
 /**
  * @brief mqttCallback() will process incoming messages on subscribed topics.
+ * ToDo: Add more commands for the board to react to.
  */
 void mqttCallback( char *topic, byte *payload, unsigned int length )
 {
@@ -336,13 +337,13 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 	Serial.println( message );
 	String str_msg = String( message );
 	if( str_msg.equals( "ON" ) )
-		digitalWrite( MCU_LED, HIGH );
+		digitalWrite( MCU_LED, 1 );
 	else if( str_msg.equals( "on" ) )
-		digitalWrite( MCU_LED, HIGH );
+		digitalWrite( MCU_LED, 1 );
 	else if( str_msg.equals( "OFF" ) )
-		digitalWrite( MCU_LED, LOW );
+		digitalWrite( MCU_LED, 0 );
 	else if( str_msg.equals( "off" ) )
-		digitalWrite( MCU_LED, LOW );
+		digitalWrite( MCU_LED, 0 );
 	else
 		Serial.printf( "Unknown command '%s'\n", message );
 } // End of the mqttCallback() function.
@@ -358,7 +359,7 @@ void mqttConnect()
 	if( lastBrokerConnect == 0 || ( time > brokerCoolDown && ( time - brokerCoolDown ) > lastBrokerConnect ) )
 	{
 		lastBrokerConnect = millis();
-		digitalWrite( MCU_LED, LOW );
+		digitalWrite( MCU_LED, 0 );
 		Serial.printf( "Connecting to broker at %s:%d...\n", broker, port );
 		mqttClient.setServer( broker, port );
 		mqttClient.setCallback( mqttCallback );
@@ -377,7 +378,7 @@ void mqttConnect()
 		}
 
 		mqttClient.subscribe( "led1" );
-		digitalWrite( MCU_LED, HIGH );
+		digitalWrite( MCU_LED, 1 );
 	}
 } // End of the mqttConnect() function.
 
@@ -396,7 +397,7 @@ void setup()
 	// Set GPIO 2 (MCU_LED) as an output.
 	pinMode( MCU_LED, OUTPUT );
 	// Turn the LED on.
-	digitalWrite( MCU_LED, HIGH );
+	digitalWrite( MCU_LED, 1 );
 
 	setupSht30();
 
@@ -444,6 +445,8 @@ void loop()
 		if( mqttClient.connected() )
 			publishTelemetry();
 		lastPublishTime = millis();
+
+		Serial.printf( "Next publish in %u seconds.\n\n", publishInterval / 1000 );
 	}
 
 	currentTime = millis();
