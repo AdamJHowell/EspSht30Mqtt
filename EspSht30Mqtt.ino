@@ -16,8 +16,8 @@
 char ipAddress[16];												// A character array to hold the IP address.
 char macAddress[18];												// A character array to hold the MAC address, and append a dash and 3 numbers.
 long rssi;															// A global to hold the Received Signal Strength Indicator.
-unsigned int printInterval = 15000;							// How long to wait between telemetry printouts.
-unsigned int publishInterval = 60000;						// How long to wait between telemetry publishes.
+unsigned int printInterval = 7000;							// How long to wait between telemetry printouts.
+unsigned int publishInterval = 20000;						// How long to wait between telemetry publishes.
 unsigned int wifiConnectCount = 0;							// A counter for how many times the wifiConnect() function has been called.
 unsigned int mqttConnectCount = 0;							// A counter for how many times the mqttConnect() function has been called.
 unsigned long printCount = 0;									// A counter of how many times the stats have been printed.
@@ -30,6 +30,8 @@ unsigned long wifiConnectionTimeout = 15000;				// The amount of time to wait fo
 unsigned long ledBlinkInterval = 200;						// The interval between telemetry processing times.
 unsigned long lastLedBlinkTime = 0;							// The time of the last telemetry process.
 const unsigned int MCU_LED = 2;								// The GPIO which the onboard LED is connected to.
+const unsigned int JSON_DOC_SIZE = 512;					// The ArduinoJson document size.
+const char *commandTopic = "AdamsEspArmada/commands"; // The topic used to subscribe to update commands.  Commands: publishTelemetry, changeTelemetryInterval, publishStatus.
 const char *topicPrefix = "AdamsEspArmada/";				// The MQTT topic prefix, which will have suffixes appended to.
 const char *tempCTopic = "sht30/tempC";					// The MQTT Celsius temperature topic suffix.
 const char *tempFTopic = "sht30/tempF";					// The MQTT Fahrenheit temperature topic suffix.
@@ -40,6 +42,7 @@ const char *ipTopic = "ip";									// The IP address topic suffix.
 const char *wifiCountTopic = "wifiCount";					// The Wi-Fi count topic suffix.
 const char *mqttCountTopic = "mqttCount";					// The MQTT count topic suffix.
 const char *publishCountTopic = "publishCount";			// The publishCount topic suffix.
+const char *mqttTopic = "espWeather";						// The topic used to publish a single JSON message containing all data.
 float sht30TempCArray[] = { 21.12, 21.12, 21.12 };		// An array to hold the 3 most recent Celsius values.
 float sht30HumidityArray[] = { 21.12, 21.12, 21.12 }; // An array to hold the 3 most recent values.
 //const char *wifiSsid = "nunya";											// Wi-Fi SSID.  Defined in privateInfo.h
@@ -279,6 +282,25 @@ void printTelemetry()
  */
 void publishTelemetry()
 {
+	// Create a JSON Document on the stack.
+	StaticJsonDocument<JSON_DOC_SIZE> publishTelemetryJsonDoc;
+	// Add data: __FILE__, macAddress, ipAddress, tempC, tempF, soilMoisture, rssi, publishCount, notes
+	publishTelemetryJsonDoc["sketch"] = __FILE__;
+	publishTelemetryJsonDoc["mac"] = macAddress;
+	publishTelemetryJsonDoc["ip"] = ipAddress;
+	publishTelemetryJsonDoc["tempC"] = averageArray( sht30TempCArray );
+	publishTelemetryJsonDoc["tempF"] = cToF( averageArray( sht30TempCArray ) );
+	publishTelemetryJsonDoc["rssi"] = rssi;
+	publishTelemetryJsonDoc["publishCount"] = publishCount;
+	// Prepare a String to hold the JSON.
+	char mqttString[JSON_DOC_SIZE];
+	// Serialize the JSON into mqttString, with indentation and line breaks.
+	serializeJsonPretty( publishTelemetryJsonDoc, mqttString );
+	// Publish the JSON to the MQTT broker.
+	bool success = mqttClient.publish( mqttTopic, mqttString, false );
+	if( success )
+		Serial.printf( "Successfully published to '%s'\n", mqttTopic );
+
 	publishCount++;
 	char topicBuffer[256] = "";
 	char valueBuffer[25] = "";
@@ -328,24 +350,34 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 {
 	Serial.printf( "\nMessage arrived on Topic: '%s'\n", topic );
 
-	char message[5] = { 0x00 };
+	StaticJsonDocument<JSON_DOC_SIZE> callbackJsonDoc;
+	deserializeJson( callbackJsonDoc, payload, length );
 
-	for( unsigned int i = 0; i < length; i++ )
-		message[i] = ( char ) payload[i];
-
-	message[length] = 0x00;
-	Serial.println( message );
-	String str_msg = String( message );
-	if( str_msg.equals( "ON" ) )
-		digitalWrite( MCU_LED, 1 );
-	else if( str_msg.equals( "on" ) )
-		digitalWrite( MCU_LED, 1 );
-	else if( str_msg.equals( "OFF" ) )
-		digitalWrite( MCU_LED, 0 );
-	else if( str_msg.equals( "off" ) )
-		digitalWrite( MCU_LED, 0 );
+	const char *command = callbackJsonDoc["command"];
+	if( strcmp( command, "publishTelemetry" ) == 0 )
+	{
+		Serial.println( "Reading and publishing sensor values." );
+		// Poll the sensor.
+		readTelemetry();
+		// Publish the sensor readings.
+		publishTelemetry();
+		Serial.println( "Readings have been published." );
+	}
+	else if( strcmp( command, "changeTelemetryInterval" ) == 0 )
+	{
+		Serial.println( "Changing the publish interval." );
+		unsigned long tempValue = callbackJsonDoc["value"];
+		// Only update the value if it is greater than 4 seconds.  This prevents a seconds vs. milliseconds confusion.
+		if( tempValue > 4000 )
+			publishInterval = tempValue;
+		Serial.print( "MQTT publish interval has been updated to " );
+		Serial.println( publishInterval );
+		lastPublishTime = 0;
+	}
+	else if( strcmp( command, "publishStatus" ) == 0 )
+		Serial.println( "publishStatus is not yet implemented." );
 	else
-		Serial.printf( "Unknown command '%s'\n", message );
+		Serial.printf( "Unknown command '%s'\n", command );
 } // End of the mqttCallback() function.
 
 /**
@@ -377,7 +409,7 @@ void mqttConnect()
 			return;
 		}
 
-		mqttClient.subscribe( "led1" );
+		mqttClient.subscribe( commandTopic );
 		digitalWrite( MCU_LED, 1 );
 	}
 } // End of the mqttConnect() function.
@@ -394,15 +426,15 @@ void setup()
 	Serial.println( "\n" );
 	Serial.println( "setup() is beginning." );
 
+	// Set the MAC address variable to its value.
+	snprintf( macAddress, 18, "%s", WiFi.macAddress().c_str() );
+
 	// Set GPIO 2 (MCU_LED) as an output.
 	pinMode( MCU_LED, OUTPUT );
 	// Turn the LED on.
 	digitalWrite( MCU_LED, 1 );
 
 	setupSht30();
-
-	// Set the MAC address variable to its value.
-	snprintf( macAddress, 18, "%s", WiFi.macAddress().c_str() );
 
 	// Read from the sensors twice, to populate their arrays.
 	readTelemetry();
