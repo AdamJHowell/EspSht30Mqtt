@@ -47,8 +47,8 @@ float sht30TempCArray[] = { 21.12, 21.12, 21.12 };		// An array to hold the 3 mo
 float sht30HumidityArray[] = { 21.12, 21.12, 21.12 }; // An array to hold the 3 most recent values.
 //const char *wifiSsid = "nunya";											// Wi-Fi SSID.  Defined in privateInfo.h
 //const char *wifiPassword = "nunya";										// Wi-Fi password.  Defined in privateInfo.h
-//const char *broker = "nunya";												// The broker address.  Defined in privateInfo.h
-//const unsigned int port = 1883;											// The broker port.  Defined in privateInfo.h
+//const char *mqttBroker = "nunya";											// The broker address.  Defined in privateInfo.h
+//const unsigned int mqttPort = 1883;										// The broker port.  Defined in privateInfo.h
 
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
@@ -198,44 +198,78 @@ void lookupMQTTCode( int code, char *buffer )
 } // End of the lookupMQTTCode() function.
 
 /**
+ * @brief checkForSSID() will scan for all visible SSIDs, see if any match 'ssidName',
+ * and return a count of how many matches were found.
+ *
+ * @param ssidName the SSID name to search for.
+ * @return int the count of SSIDs which match the passed parameter.
+ */
+int checkForSSID( const char *ssidName )
+{
+	int ssidCount = 0;
+	byte networkCount = WiFi.scanNetworks();
+	if( networkCount == 0 )
+		Serial.println( "No WiFi SSIDs are in range!" );
+	else
+	{
+		Serial.printf( "WiFi SSIDs in range: %d\n", networkCount );
+		for( int i = 0; i < networkCount; ++i )
+		{
+			// Check to see if this SSID matches the parameter.
+			if( strcmp( ssidName, WiFi.SSID( i ).c_str() ) == 0 )
+				ssidCount++;
+		}
+	}
+	return ssidCount;
+} // End of checkForSSID() function.
+
+/**
  * @brief wifiConnect() will connect to a SSID.
  */
 void wifiConnect()
 {
-	wifiConnectCount++;
-	// Turn the LED off to show Wi-Fi is not connected.
-	digitalWrite( MCU_LED, 0 );
-
-	Serial.printf( "Attempting to connect to Wi-Fi SSID '%s'", wifiSsid );
-	WiFi.mode( WIFI_STA );
-	WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
-	const char *hostName = macAddress;
-	WiFi.setHostname( hostName );
-	WiFi.begin( wifiSsid, wifiPassword );
-
-	unsigned long wifiConnectionStartTime = millis();
-
-	// Loop until connected, or until wifiConnectionTimeout.
-	while( WiFi.status() != WL_CONNECTED && ( millis() - wifiConnectionStartTime < wifiConnectionTimeout ) )
+	int ssidCount = checkForSSID( wifiSsid );
+	if( ssidCount == 0 )
 	{
-		Serial.print( "." );
-		delay( 1000 );
-	}
-	Serial.println( "" );
-
-	if( WiFi.status() == WL_CONNECTED )
-	{
-		// Print that Wi-Fi has connected.
-		Serial.println( "\nWi-Fi connection established!" );
-		snprintf( ipAddress, 16, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3] );
-		// Turn the LED on to show that Wi-Fi is connected.
-		digitalWrite( MCU_LED, 1 );
-		return;
+		Serial.printf( "SSID '%s' is not in range!\n", wifiSsid );
+		digitalWrite( MCU_LED, 0 ); // Turn the LED off to show that Wi-Fi has no chance of connecting.
 	}
 	else
-		Serial.println( "Wi-Fi failed to connect in the timeout period.\n" );
-} // End of the wifiConnect() function.
+	{
+		wifiConnectCount++;
+		// Turn the LED off to show Wi-Fi is not connected.
+		digitalWrite( MCU_LED, 0 );
 
+		Serial.printf( "Attempting to connect to Wi-Fi SSID '%s'", wifiSsid );
+		WiFi.mode( WIFI_STA );
+		WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
+		const char *hostName = macAddress;
+		WiFi.setHostname( hostName );
+		WiFi.begin( wifiSsid, wifiPassword );
+
+		unsigned long wifiConnectionStartTime = millis();
+
+		// Loop until connected, or until wifiConnectionTimeout.
+		while( WiFi.status() != WL_CONNECTED && ( millis() - wifiConnectionStartTime < wifiConnectionTimeout ) )
+		{
+			Serial.print( "." );
+			delay( 1000 );
+		}
+		Serial.println( "" );
+
+		if( WiFi.status() == WL_CONNECTED )
+		{
+			// Print that Wi-Fi has connected.
+			Serial.println( "\nWi-Fi connection established!" );
+			snprintf( ipAddress, 16, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3] );
+			// Turn the LED on to show that Wi-Fi is connected.
+			digitalWrite( MCU_LED, 1 );
+			return;
+		}
+		else
+			Serial.println( "Wi-Fi failed to connect in the timeout period.\n" );
+	}
+} // End of the wifiConnect() function.
 
 /**
  * @brief configureOTA() will configure and initiate Over The Air (OTA) updates for this device.
@@ -256,32 +290,31 @@ void configureOTA()
 	// ArduinoOTA.setPort( 3232 );
 	// The ESP32 hostname defaults to esp32-[MAC]
 //	ArduinoOTA.setHostname( hostName );  // I'm deliberately using the default.
-	// Authentication is disabled by default.
-	// ArduinoOTA.setPassword( "admin" );
-	// Password can be set with it's md5 value as well
-	// MD5( admin ) = 21232f297a57a5a743894a0e4a801fc3
-	// ArduinoOTA.setPasswordHash( "21232f297a57a5a743894a0e4a801fc3" );
+// Authentication is disabled by default.
+// ArduinoOTA.setPassword( "admin" );
+// Password can be set with it's md5 value as well
+// MD5( admin ) = 21232f297a57a5a743894a0e4a801fc3
+// ArduinoOTA.setPasswordHash( "21232f297a57a5a743894a0e4a801fc3" );
 #endif
 
-//	Serial.printf( "Using hostname '%s'\n", hostName );
+	//	Serial.printf( "Using hostname '%s'\n", hostName );
 
-	String type = "filesystem";	// SPIFFS
+	String type = "filesystem"; // SPIFFS
 	if( ArduinoOTA.getCommand() == U_FLASH )
 		type = "sketch";
 
 	// Configure the OTA callbacks.
-	ArduinoOTA.onStart( []()
-							  {
-								  String type = "flash";	// U_FLASH
-								  if( ArduinoOTA.getCommand() == U_SPIFFS )
-									  type = "filesystem";
-								  // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-								  Serial.print( "OTA is updating the " );
-								  Serial.println( type );
-							  } );
+	ArduinoOTA.onStart( []() {
+		String type = "flash"; // U_FLASH
+		if( ArduinoOTA.getCommand() == U_SPIFFS )
+			type = "filesystem";
+		// NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+		Serial.print( "OTA is updating the " );
+		Serial.println( type );
+	} );
 	ArduinoOTA.onEnd( []() { Serial.println( "\nTerminating OTA communication." ); } );
-	ArduinoOTA.onProgress( []( unsigned int progress, unsigned int total ){ Serial.printf( "OTA progress: %u%%\r", ( progress / ( total / 100 ) ) ); } );
-	ArduinoOTA.onError( []( ota_error_t error ){
+	ArduinoOTA.onProgress( []( unsigned int progress, unsigned int total ) { Serial.printf( "OTA progress: %u%%\r", ( progress / ( total / 100 ) ) ); } );
+	ArduinoOTA.onError( []( ota_error_t error ) {
 		Serial.printf( "Error[%u]: ", error );
 		if( error == OTA_AUTH_ERROR ) Serial.println( "OTA authentication failed!" );
 		else if( error == OTA_BEGIN_ERROR ) Serial.println( "OTA transmission failed to initiate properly!" );
@@ -327,7 +360,7 @@ void printTelemetry()
 		Serial.printf( "RSSI: %ld\n", rssi );
 	}
 	Serial.printf( "mqttConnectCount: %u\n", mqttConnectCount );
-	Serial.printf( "Broker: %s:%d\n", broker, port );
+	Serial.printf( "Broker: %s:%d\n", mqttBroker, mqttPort );
 	int mqttStateCode = mqttClient.state();
 	lookupMQTTCode( mqttStateCode, buffer );
 	Serial.printf( "MQTT state: %s\n", buffer );
@@ -454,8 +487,8 @@ void mqttConnect()
 	{
 		lastBrokerConnect = millis();
 		digitalWrite( MCU_LED, 0 );
-		Serial.printf( "Connecting to broker at %s:%d...\n", broker, port );
-		mqttClient.setServer( broker, port );
+		Serial.printf( "Connecting to broker at %s:%d...\n", mqttBroker, mqttPort );
+		mqttClient.setServer( mqttBroker, mqttPort );
 		mqttClient.setCallback( mqttCallback );
 
 		// Connect to the broker, using the MAC address for a MQTT client ID.
