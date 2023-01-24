@@ -92,9 +92,13 @@ float cToF( float value )
 
 /**
  * @brief addValue() will add the passed value to the passed array, after moving the existing array values to higher indexes.
+ * If value is less than minValue, or greater than maxValue, it will be discarded and nothing will be added to valueArray.
  */
-void addValue( float valueArray[], float value )
+void addValue( float valueArray[], float value, float minValue, float maxValue )
 {
+	// Prevent sensor anomalies from getting into the array.
+	if( value < minValue || value > maxValue )
+		return;
 	valueArray[2] = valueArray[1];
 	valueArray[1] = valueArray[0];
 	valueArray[0] = value;
@@ -344,8 +348,8 @@ void readTelemetry()
 {
 	rssi = WiFi.RSSI();
 	// Add current readings into the appropriate arrays.
-	addValue( sht30TempCArray, sht31.readTemperature() );
-	addValue( sht30HumidityArray, sht31.readHumidity() );
+	addValue( sht30TempCArray, sht31.readTemperature(), -42, 212 );
+	addValue( sht30HumidityArray, sht31.readHumidity(), 0, 100 );
 } // End of the readTelemetry() function.
 
 /**
