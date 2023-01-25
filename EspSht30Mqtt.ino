@@ -56,7 +56,7 @@ float sht30HumidityArray[] = { 21.12, 21.12, 21.12 }; // An array to hold the 3 
 //const unsigned int mqttPort = 1883;										// The broker port.  Defined in privateInfo.h
 
 
-Adafruit_SHT31 sht31 = Adafruit_SHT31();
+Adafruit_SHT31 sht30 = Adafruit_SHT31();
 WiFiClient wifiClient;
 PubSubClient mqttClient( wifiClient );
 
@@ -67,7 +67,7 @@ void setupSht30()
 {
 	unsigned int address = 0x44;
 	// Set to 0x45 for alternate i2c address.
-	if( !sht31.begin( address ) )
+	if( !sht30.begin( address ) )
 	{
 		Serial.printf( "Could not find SHT30 at address %X!\n", address );
 		Serial.println( "  Please fix the problem and reboot the device." );
@@ -77,7 +77,7 @@ void setupSht30()
 	}
 
 	Serial.print( "SHT30 heater state: " );
-	if( sht31.isHeaterEnabled() )
+	if( sht30.isHeaterEnabled() )
 		Serial.println( "ENABLED" );
 	else
 		Serial.println( "DISABLED" );
@@ -352,8 +352,8 @@ void readTelemetry()
 {
 	rssi = WiFi.RSSI();
 	// Add current readings into the appropriate arrays.
-	addValue( sht30TempCArray, sht31.readTemperature(), -42, 212 );
-	addValue( sht30HumidityArray, sht31.readHumidity(), 0, 100 );
+	addValue( sht30TempCArray, sht30.readTemperature(), -42, 212 );
+	addValue( sht30HumidityArray, sht30.readHumidity(), 0, 100 );
 } // End of the readTelemetry() function.
 
 /**
