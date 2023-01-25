@@ -20,6 +20,7 @@ unsigned int printInterval = 7000;							// How long to wait between telemetry p
 unsigned int publishInterval = 20000;						// How long to wait between telemetry publishes.
 unsigned int wifiConnectCount = 0;							// A counter for how many times the wifiConnect() function has been called.
 unsigned int mqttConnectCount = 0;							// A counter for how many times the mqttConnect() function has been called.
+unsigned int invalidValueCount = 0;							// A counter of how many time invalid values have been measured.
 unsigned long printCount = 0;									// A counter of how many times the stats have been printed.
 unsigned long publishCount = 0;								// A counter of how many times the stats have been published.
 unsigned long lastPrintTime = 0;								// The last time telemetry was printed.
@@ -98,7 +99,10 @@ void addValue( float valueArray[], float value, float minValue, float maxValue )
 {
 	// Prevent sensor anomalies from getting into the array.
 	if( value < minValue || value > maxValue )
+	{
+		invalidValueCount++;
 		return;
+	}
 	valueArray[2] = valueArray[1];
 	valueArray[1] = valueArray[0];
 	valueArray[0] = value;
@@ -382,6 +386,7 @@ void printTelemetry()
 	Serial.printf( "SHT30 tempC: %f\n", averageArray( sht30TempCArray ) );
 	Serial.printf( "SHT30 tempF: %f\n", cToF( averageArray( sht30TempCArray ) ) );
 	Serial.printf( "SHT30 humidity: %f\n", averageArray( sht30HumidityArray ) );
+	Serial.printf( "Invalid readings: %u\n", invalidValueCount );
 } // End of the printTelemetry() function.
 
 /**
@@ -399,6 +404,7 @@ void publishTelemetry()
 	publishTelemetryJsonDoc["tempF"] = cToF( averageArray( sht30TempCArray ) );
 	publishTelemetryJsonDoc["rssi"] = rssi;
 	publishTelemetryJsonDoc["publishCount"] = publishCount;
+	publishTelemetryJsonDoc["invalidValueCount"] = invalidValueCount;
 	// Prepare a String to hold the JSON.
 	char mqttString[JSON_DOC_SIZE];
 	// Serialize the JSON into mqttString, with indentation and line breaks.
