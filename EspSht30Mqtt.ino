@@ -390,7 +390,7 @@ void printTelemetry()
 } // End of the printTelemetry() function.
 
 /**
- * @brief mqttCallback() will process incoming messages on subscribed topics.
+ * @brief publishTelemetry() will process incoming messages on subscribed topics.
  */
 void publishTelemetry()
 {
@@ -472,7 +472,7 @@ void publishTelemetry()
 	snprintf( valueBuffer, 25, "%lu", publishCount );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
-} // End of the printTelemetry() function.
+} // End of the publishTelemetry() function.
 
 /**
  * @brief mqttCallback() will process incoming messages on subscribed topics.
