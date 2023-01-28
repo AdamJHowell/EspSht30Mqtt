@@ -615,7 +615,6 @@ void loop()
 	// Publish only if connected.  Publish the first time.  Avoid subtraction overflow.  Publish every interval.
 	if( mqttClient.connected() && ( lastPublishTime == 0 || ( currentTime > publishInterval && ( currentTime - publishInterval ) > lastPublishTime ) ) )
 	{
-		publishCount++;
 		publishTelemetry();
 		lastPublishTime = millis();
 
