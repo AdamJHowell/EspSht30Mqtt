@@ -13,43 +13,44 @@
 #include <WiFiUdp.h>			 // Arduino Over-The-Air updates.
 
 
-char ipAddress[16];												// A character array to hold the IP address.
-char macAddress[18];												// A character array to hold the MAC address, and append a dash and 3 numbers.
-long rssi;															// A global to hold the Received Signal Strength Indicator.
-unsigned int printInterval = 7000;							// How long to wait between telemetry printouts.
-unsigned int publishInterval = 20000;						// How long to wait between telemetry publishes.
-unsigned int wifiConnectCount = 0;							// A counter for how many times the wifiConnect() function has been called.
-unsigned int mqttConnectCount = 0;							// A counter for how many times the mqttConnect() function has been called.
-unsigned int invalidValueCount = 0;							// A counter of how many time invalid values have been measured.
-unsigned long printCount = 0;									// A counter of how many times the stats have been printed.
-unsigned long publishCount = 0;								// A counter of how many times the stats have been published.
-unsigned long lastPrintTime = 0;								// The last time telemetry was printed.
-unsigned long lastPublishTime = 0;							// The last time a MQTT publish was performed.
-unsigned long lastWifiConnect = 0;							// The last time a Wi-Fi connection was attempted.
-unsigned long lastBrokerConnect = 0;						// The last time a MQTT broker connection was attempted.
-unsigned long wifiCoolDown = 10000;							// How long to wait between Wi-Fi connection attempts.
-unsigned long mqttCoolDown = 10000;							// How long to wait between MQTT broker connection attempts.
-unsigned long wifiConnectionTimeout = 15000;				// The amount of time to wait for a Wi-Fi connection.
-unsigned long ledBlinkInterval = 200;						// The interval between telemetry processing times.
-unsigned long lastLedBlinkTime = 0;							// The time of the last telemetry process.
-const unsigned int MCU_LED = 2;								// The GPIO which the onboard LED is connected to.
-const unsigned int JSON_DOC_SIZE = 512;					// The ArduinoJson document size.
-const char *commandTopic = "AdamsEspArmada/commands"; // The topic used to subscribe to update commands.  Commands: publishTelemetry, changeTelemetryInterval, publishStatus.
-const char *topicPrefix = "AdamsEspArmada/";				// The MQTT topic prefix, which will have suffixes appended to.
-const char *tempCTopic = "sht30/tempC";					// The MQTT Celsius temperature topic suffix.
-const char *tempFTopic = "sht30/tempF";					// The MQTT Fahrenheit temperature topic suffix.
-const char *humidityTopic = "sht30/humidity";			// The MQTT humidity topic suffix.
-const char *rssiTopic = "rssi";								// The RSSI topic suffix.
-const char *macTopic = "mac";									// The MAC address topic suffix.
-const char *ipTopic = "ip";									// The IP address topic suffix.
-const char *wifiCountTopic = "wifiCount";					// The Wi-Fi count topic suffix.
-const char *wifiCoolDownTopic = "wifiCoolDown";			// The Wi-Fi count topic suffix.
-const char *mqttCountTopic = "mqttCount";					// The MQTT count topic suffix.
-const char *mqttCoolDownTopic = "mqttCoolDown";			// The MQTT count topic suffix.
-const char *publishCountTopic = "publishCount";			// The publishCount topic suffix.
-const char *mqttTopic = "espWeather";						// The topic used to publish a single JSON message containing all data.
-float sht30TempCArray[] = { 21.12, 21.12, 21.12 };		// An array to hold the 3 most recent Celsius values.
-float sht30HumidityArray[] = { 21.12, 21.12, 21.12 }; // An array to hold the 3 most recent values.
+char ipAddress[16];												  // A character array to hold the IP address.
+char macAddress[18];												  // A character array to hold the MAC address, and append a dash and 3 numbers.
+long rssi;															  // A global to hold the Received Signal Strength Indicator.
+unsigned int printInterval = 7000;							  // How long to wait between telemetry printouts.
+unsigned int publishInterval = 20000;						  // How long to wait between telemetry publishes.
+unsigned int wifiConnectCount = 0;							  // A counter for how many times the wifiConnect() function has been called.
+unsigned int mqttConnectCount = 0;							  // A counter for how many times the mqttConnect() function has been called.
+unsigned int invalidValueCount = 0;							  // A counter of how many time invalid values have been measured.
+unsigned long printCount = 0;									  // A counter of how many times the stats have been printed.
+unsigned long publishCount = 0;								  // A counter of how many times the stats have been published.
+unsigned long callbackCount = 0;								  // The number of times a callback was received.
+unsigned long lastPrintTime = 0;								  // The last time telemetry was printed.
+unsigned long lastPublishTime = 0;							  // The last time a MQTT publish was performed.
+unsigned long lastWifiConnectTime = 0;						  // The last time a Wi-Fi connection was attempted.
+unsigned long lastMqttConnectionTime = 0;					  // The last time a MQTT broker connection was attempted.
+unsigned long wifiCoolDownInterval = 10000;				  // How long to wait between Wi-Fi connection attempts.
+unsigned long mqttCoolDownInterval = 10000;				  // How long to wait between MQTT broker connection attempts.
+unsigned long wifiConnectionTimeout = 15000;				  // The amount of time to wait for a Wi-Fi connection.
+unsigned long ledBlinkInterval = 200;						  // The interval between telemetry processing times.
+unsigned long lastLedBlinkTime = 0;							  // The time of the last telemetry process.
+const unsigned int ONBOARD_LED = 2;							  // The GPIO which the onboard LED is connected to.
+const unsigned int JSON_DOC_SIZE = 512;					  // The ArduinoJson document size.
+const char *commandTopic = "AdamsEspArmada/commands";	  // The topic used to subscribe to update commands.  Commands: publishTelemetry, changeTelemetryInterval, publishStatus.
+const char *topicPrefix = "AdamsEspArmada/";				  // The MQTT topic prefix, which will have suffixes appended to.
+const char *tempCTopic = "sht30/tempC";					  // The MQTT Celsius temperature topic suffix.
+const char *tempFTopic = "sht30/tempF";					  // The MQTT Fahrenheit temperature topic suffix.
+const char *humidityTopic = "sht30/humidity";			  // The MQTT humidity topic suffix.
+const char *rssiTopic = "rssi";								  // The RSSI topic suffix.
+const char *macTopic = "mac";									  // The MAC address topic suffix.
+const char *ipTopic = "ip";									  // The IP address topic suffix.
+const char *wifiCountTopic = "wifiCount";					  // The Wi-Fi count topic suffix.
+const char *wifiCoolDownTopic = "wifiCoolDownInterval"; // The Wi-Fi count topic suffix.
+const char *mqttCountTopic = "mqttCount";					  // The MQTT count topic suffix.
+const char *mqttCoolDownTopic = "mqttCoolDownInterval"; // The MQTT count topic suffix.
+const char *publishCountTopic = "publishCount";			  // The publishCount topic suffix.
+const char *mqttTopic = "espWeather";						  // The topic used to publish a single JSON message containing all data.
+float sht30TempCArray[] = { 21.12, 21.12, 21.12 };		  // An array to hold the 3 most recent Celsius values.
+float sht30HumidityArray[] = { 21.12, 21.12, 21.12 };	  // An array to hold the 3 most recent values.
 //const char *wifiSsid = "nunya";											// Wi-Fi SSID.  Defined in privateInfo.h
 //const char *wifiPassword = "nunya";										// Wi-Fi password.  Defined in privateInfo.h
 //const char *mqttBroker = "nunya";											// The broker address.  Defined in privateInfo.h
@@ -128,10 +129,10 @@ float averageArray( float valueArray[] )
  */
 void toggleLED()
 {
-	if( digitalRead( MCU_LED ) != 1 )
-		digitalWrite( MCU_LED, 1 );
+	if( digitalRead( ONBOARD_LED ) != 1 )
+		digitalWrite( ONBOARD_LED, 1 );
 	else
-		digitalWrite( MCU_LED, 0 );
+		digitalWrite( ONBOARD_LED, 0 );
 } // End of toggleLED() function.
 
 /**
@@ -241,19 +242,19 @@ int checkForSSID( const char *ssidName )
 void wifiConnect()
 {
 	long time = millis();
-	if( lastWifiConnect == 0 || ( time > wifiCoolDown && ( time - wifiCoolDown ) > lastWifiConnect ) )
+	if( lastWifiConnectTime == 0 || ( time > wifiCoolDownInterval && ( time - wifiCoolDownInterval ) > lastWifiConnectTime ) )
 	{
 		int ssidCount = checkForSSID( wifiSsid );
 		if( ssidCount == 0 )
 		{
 			Serial.printf( "SSID '%s' is not in range!\n", wifiSsid );
-			digitalWrite( MCU_LED, 0 ); // Turn the LED off to show that Wi-Fi has no chance of connecting.
+			digitalWrite( ONBOARD_LED, 0 ); // Turn the LED off to show that Wi-Fi has no chance of connecting.
 		}
 		else
 		{
 			wifiConnectCount++;
 			// Turn the LED off to show Wi-Fi is not connected.
-			digitalWrite( MCU_LED, 0 );
+			digitalWrite( ONBOARD_LED, 0 );
 
 			Serial.printf( "Attempting to connect to Wi-Fi SSID '%s'", wifiSsid );
 			WiFi.mode( WIFI_STA );
@@ -278,13 +279,13 @@ void wifiConnect()
 				Serial.println( "\nWi-Fi connection established!" );
 				snprintf( ipAddress, 16, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3] );
 				// Turn the LED on to show that Wi-Fi is connected.
-				digitalWrite( MCU_LED, 1 );
+				digitalWrite( ONBOARD_LED, 1 );
 				return;
 			}
 			else
 				Serial.println( "Wi-Fi failed to connect in the timeout period.\n" );
 		}
-		lastWifiConnect = millis();
+		lastWifiConnectTime = millis();
 	}
 } // End of the wifiConnect() function.
 
@@ -363,30 +364,41 @@ void printTelemetry()
 {
 	Serial.println();
 	printCount++;
-	Serial.printf( "Publish count %ld\n", printCount );
-	Serial.printf( "MAC address: %s\n", macAddress );
+	Serial.println( __FILE__ );
+	Serial.printf( "Print count %ld\n", printCount );
+	Serial.println();
+
+	Serial.println( "Network stats:" );
+	Serial.printf( "  MAC address: %s\n", macAddress );
 	int wifiStatusCode = WiFi.status();
 	char buffer[29];
 	lookupWifiCode( wifiStatusCode, buffer );
-	Serial.printf( "wifiConnectCount: %u\n", wifiConnectCount );
-	Serial.printf( "wifiCoolDown: %lu\n", wifiCoolDown );
-	Serial.printf( "Wi-Fi status text: %s\n", buffer );
-	Serial.printf( "Wi-Fi status code: %d\n", wifiStatusCode );
 	if( wifiStatusCode == 3 )
 	{
-		Serial.printf( "IP address: %s\n", ipAddress );
-		Serial.printf( "RSSI: %ld\n", rssi );
+		Serial.printf( "  IP address: %s\n", ipAddress );
+		Serial.printf( "  RSSI: %ld\n", rssi );
 	}
-	Serial.printf( "mqttConnectCount: %u\n", mqttConnectCount );
-	Serial.printf( "mqttCoolDown: %lu\n", mqttCoolDown );
-	Serial.printf( "Broker: %s:%d\n", mqttBroker, mqttPort );
-	int mqttStateCode = mqttClient.state();
-	lookupMQTTCode( mqttStateCode, buffer );
-	Serial.printf( "MQTT state: %s\n", buffer );
-	Serial.printf( "SHT30 tempC: %f\n", averageArray( sht30TempCArray ) );
-	Serial.printf( "SHT30 tempF: %f\n", cToF( averageArray( sht30TempCArray ) ) );
-	Serial.printf( "SHT30 humidity: %f\n", averageArray( sht30HumidityArray ) );
-	Serial.printf( "Invalid readings: %u\n", invalidValueCount );
+	Serial.printf( "  wifiConnectCount: %u\n", wifiConnectCount );
+	Serial.printf( "  wifiCoolDownInterval: %lu\n", wifiCoolDownInterval );
+	Serial.printf( "  Wi-Fi status text: %s\n", buffer );
+	Serial.printf( "  Wi-Fi status code: %d\n", wifiStatusCode );
+	Serial.println();
+
+	Serial.println( "MQTT stats:" );
+	Serial.printf( "  mqttConnectCount: %u\n", mqttConnectCount );
+	Serial.printf( "  mqttCoolDownInterval: %lu\n", mqttCoolDownInterval );
+	Serial.printf( "  Broker: %s:%d\n", mqttBroker, mqttPort );
+	lookupMQTTCode( mqttClient.state(), buffer );
+	Serial.printf( "  MQTT state: %s\n", buffer );
+	Serial.printf( "  Publish count: %lu\n", publishCount );
+	Serial.printf( "  Callback count: %lu\n", callbackCount );
+	Serial.println();
+
+	Serial.println( "Environmental stats:" );
+	Serial.printf( "  SHT30 tempC: %f\n", averageArray( sht30TempCArray ) );
+	Serial.printf( "  SHT30 tempF: %f\n", cToF( averageArray( sht30TempCArray ) ) );
+	Serial.printf( "  SHT30 humidity: %f\n", averageArray( sht30HumidityArray ) );
+	Serial.printf( "  Invalid readings: %u\n", invalidValueCount );
 } // End of the printTelemetry() function.
 
 /**
@@ -454,7 +466,7 @@ void publishTelemetry()
 	mqttClient.publish( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCoolDownTopic );
-	snprintf( valueBuffer, 25, "%lu", wifiCoolDown );
+	snprintf( valueBuffer, 25, "%lu", wifiCoolDownInterval );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
 
@@ -464,7 +476,7 @@ void publishTelemetry()
 	mqttClient.publish( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCoolDownTopic );
-	snprintf( valueBuffer, 25, "%lu", mqttCoolDown );
+	snprintf( valueBuffer, 25, "%lu", mqttCoolDownInterval );
 	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
 	mqttClient.publish( topicBuffer, valueBuffer );
 
@@ -482,6 +494,7 @@ void publishTelemetry()
  */
 void mqttCallback( char *topic, byte *payload, unsigned int length )
 {
+	callbackCount++;
 	Serial.printf( "\nMessage arrived on Topic: '%s'\n", topic );
 
 	StaticJsonDocument<JSON_DOC_SIZE> callbackJsonDoc;
@@ -522,10 +535,10 @@ void mqttConnect()
 {
 	long time = millis();
 	// Connect the first time.  Avoid subtraction overflow.  Connect after cool down.
-	if( lastBrokerConnect == 0 || ( time > mqttCoolDown && ( time - mqttCoolDown ) > lastBrokerConnect ) )
+	if( lastMqttConnectionTime == 0 || ( time > mqttCoolDownInterval && ( time - mqttCoolDownInterval ) > lastMqttConnectionTime ) )
 	{
 		mqttConnectCount++;
-		digitalWrite( MCU_LED, 0 );
+		digitalWrite( ONBOARD_LED, 0 );
 		Serial.printf( "Connecting to broker at %s:%d...\n", mqttBroker, mqttPort );
 		mqttClient.setServer( mqttBroker, mqttPort );
 		mqttClient.setCallback( mqttCallback );
@@ -535,7 +548,7 @@ void mqttConnect()
 		{
 			Serial.println( "Connected to MQTT Broker." );
 			mqttClient.subscribe( commandTopic );
-			digitalWrite( MCU_LED, 1 );
+			digitalWrite( ONBOARD_LED, 1 );
 		}
 		else
 		{
@@ -546,12 +559,12 @@ void mqttConnect()
 			Serial.printf( "MQTT state code: %d\n", mqttStateCode );
 
 			// This block increments the broker connection "cooldown" time by 10 seconds after every failed connection, and resets it once it is over 2 minutes.
-			if( mqttCoolDown > 120000 )
-				mqttCoolDown = 0;
-			mqttCoolDown += 10000;
+			if( mqttCoolDownInterval > 120000 )
+				mqttCoolDownInterval = 0;
+			mqttCoolDownInterval += 10000;
 		}
 
-		lastBrokerConnect = millis();
+		lastMqttConnectionTime = millis();
 	}
 } // End of the mqttConnect() function.
 
@@ -565,19 +578,19 @@ void setup()
 	if( !Serial )
 		delay( 1000 );
 	Serial.println( "\n" );
-	Serial.println( "setup() is beginning." );
+	Serial.println( "Function setup() is beginning." );
 
 	// Set the MAC address variable to its value.
 	snprintf( macAddress, 18, "%s", WiFi.macAddress().c_str() );
 
-	// Set GPIO 2 (MCU_LED) as an output.
-	pinMode( MCU_LED, OUTPUT );
-	// Turn the LED on.
-	digitalWrite( MCU_LED, 1 );
+	// Set GPIO 2 (ONBOARD_LED) as an output.
+	pinMode( ONBOARD_LED, OUTPUT );
+	// Turn the LED on to show that setup() has begun.
+	digitalWrite( ONBOARD_LED, 1 );
 
 	setupSht30();
 
-	// Read from the sensors twice, to populate their arrays.
+	// Read from the sensors twice, to populate telemetry arrays.
 	readTelemetry();
 	readTelemetry();
 
@@ -631,11 +644,11 @@ void loop()
 		if( WiFi.status() == WL_CONNECTED )
 		{
 			if( mqttClient.state() != 0 )
-				toggleLED();
+				toggleLED(); // Toggle the LED state to show that Wi-Fi is connected by MQTT is not.
 			else
-				digitalWrite( MCU_LED, 1 ); // Turn the LED on to show both Wi-Fi and MQTT are connected.
+				digitalWrite( ONBOARD_LED, 1 ); // Turn the LED on to show both Wi-Fi and MQTT are connected.
 		}
 		else
-			digitalWrite( MCU_LED, 0 ); // Turn the LED off to show that Wi-Fi is not connected.
+			digitalWrite( ONBOARD_LED, 0 ); // Turn the LED off to show that Wi-Fi is not connected.
 	}
 } // End of the loop() function.
