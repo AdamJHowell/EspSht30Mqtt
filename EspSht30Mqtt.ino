@@ -300,19 +300,19 @@ void configureOTA()
 	// The ESP8266 port defaults to 8266
 	// ArduinoOTA.setPort( 8266 );
 	// The ESP8266 hostname defaults to esp8266-[ChipID]
-	ArduinoOTA.setHostname( hostName );
+	// ArduinoOTA.setHostname( hostName );
 	// Authentication is disabled by default.
 	// ArduinoOTA.setPassword( ( const char * )"admin" );
 #else
 	// The ESP32 port defaults to 3232
 	// ArduinoOTA.setPort( 3232 );
 	// The ESP32 hostname defaults to esp32-[MAC]
-//	ArduinoOTA.setHostname( hostName );  // I'm deliberately using the default.
-// Authentication is disabled by default.
-// ArduinoOTA.setPassword( "admin" );
-// Password can be set with it's md5 value as well
-// MD5( admin ) = 21232f297a57a5a743894a0e4a801fc3
-// ArduinoOTA.setPasswordHash( "21232f297a57a5a743894a0e4a801fc3" );
+	//	ArduinoOTA.setHostname( hostName );  // I'm deliberately using the default.
+	// Authentication is disabled by default.
+	// ArduinoOTA.setPassword( "admin" );
+	// Password can be set with it's md5 value as well
+	// MD5( admin ) = 21232f297a57a5a743894a0e4a801fc3
+	// ArduinoOTA.setPasswordHash( "21232f297a57a5a743894a0e4a801fc3" );
 #endif
 
 	//	Serial.printf( "Using hostname '%s'\n", hostName );
@@ -583,7 +583,7 @@ void setup()
 	// Set the MAC address variable to its value.
 	snprintf( macAddress, 18, "%s", WiFi.macAddress().c_str() );
 
-	// Set GPIO 2 (ONBOARD_LED) as an output.
+	// Set ONBOARD_LED (GPIO 2) as an output.
 	pinMode( ONBOARD_LED, OUTPUT );
 	// Turn the LED on to show that setup() has begun.
 	digitalWrite( ONBOARD_LED, 1 );
@@ -605,13 +605,16 @@ void setup()
  */
 void loop()
 {
-	// Reconnect Wi-Fi if needed, reconnect MQTT if needed, and process MQTT tasks.
+	// Reconnect Wi-Fi if needed, reconnect MQTT if needed, and process MQTT and OTA requests.
 	if( WiFi.status() != WL_CONNECTED )
 		wifiConnect();
 	else if( !mqttClient.connected() )
 		mqttConnect();
 	else
+	{
 		mqttClient.loop();
+		ArduinoOTA.handle();
+	}
 
 	long currentTime = millis();
 	// Print the first time.  Avoid subtraction overflow.  Print every interval.
