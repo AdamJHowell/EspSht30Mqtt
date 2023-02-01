@@ -20,7 +20,8 @@ unsigned int printInterval = 7000;							  // How long to wait between telemetry
 unsigned int publishInterval = 20000;						  // How long to wait between telemetry publishes.
 unsigned int wifiConnectCount = 0;							  // A counter for how many times the wifiConnect() function has been called.
 unsigned int mqttConnectCount = 0;							  // A counter for how many times the mqttConnect() function has been called.
-unsigned int invalidValueCount = 0;							  // A counter of how many time invalid values have been measured.
+unsigned int invalidValueCount = 0;							  // A counter of how many times invalid values have been measured.
+unsigned int publishNow = 0;									  // A flag to indicate that a publish should happen immediately.
 unsigned long printCount = 0;									  // A counter of how many times the stats have been printed.
 unsigned long publishCount = 0;								  // A counter of how many times the stats have been published.
 unsigned long callbackCount = 0;								  // The number of times a callback was received.
@@ -506,12 +507,8 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 	Serial.printf( "Processing command '%s'.\n", command );
 	if( strcmp( command, "publishTelemetry" ) == 0 )
 	{
-		Serial.println( "Reading and publishing sensor values." );
-		// Poll the sensor.
-		readTelemetry();
-		// Publish the sensor readings.
-		publishTelemetry();
-		Serial.println( "Readings have been published." );
+		// Set publishNow to 1, to indicate that a telemetry read and publish should happen immediately.
+		publishNow = 1;
 	}
 	else if( strcmp( command, "changeTelemetryInterval" ) == 0 )
 	{
@@ -605,7 +602,7 @@ void setup()
  */
 void loop()
 {
-	// Reconnect Wi-Fi if needed, reconnect MQTT if needed, and process MQTT and OTA requests.
+	// Reconnect Wi-Fi if needed, reconnect MQTT as needed.
 	if( WiFi.status() != WL_CONNECTED )
 		wifiConnect();
 	else if( !mqttClient.connected() )
@@ -622,27 +619,27 @@ void loop()
 	{
 		readTelemetry();
 		printTelemetry();
-		lastPrintTime = millis();
-
 		Serial.printf( "Next print in %u seconds.\n\n", printInterval / 1000 );
+		lastPrintTime = millis();
 	}
 
 	currentTime = millis();
 	// Publish only if connected.  Publish the first time.  Avoid subtraction overflow.  Publish every interval.
-	if( mqttClient.connected() && ( lastPublishTime == 0 || ( currentTime > publishInterval && ( currentTime - publishInterval ) > lastPublishTime ) ) )
+	if( mqttClient.connected() && ( publishNow == 1 || lastPublishTime == 0 || ( currentTime > publishInterval && ( currentTime - publishInterval ) > lastPublishTime ) ) )
 	{
+		if( publishNow == 1 )
+			readTelemetry();
 		publishTelemetry();
 		lastPublishTime = millis();
-
+		publishNow = 0;
 		Serial.printf( "Next publish in %u seconds.\n\n", publishInterval / 1000 );
+		lastPublishTime = millis();
 	}
 
 	currentTime = millis();
 	// Process the first time.  Avoid subtraction overflow.  Process every interval.
 	if( lastLedBlinkTime == 0 || ( ( currentTime > ledBlinkInterval ) && ( currentTime - ledBlinkInterval ) > lastLedBlinkTime ) )
 	{
-		lastLedBlinkTime = millis();
-
 		// If Wi-Fi is connected, but MQTT is not, blink the LED.
 		if( WiFi.status() == WL_CONNECTED )
 		{
@@ -653,5 +650,6 @@ void loop()
 		}
 		else
 			digitalWrite( ONBOARD_LED, 0 ); // Turn the LED off to show that Wi-Fi is not connected.
+		lastLedBlinkTime = millis();
 	}
 } // End of the loop() function.
