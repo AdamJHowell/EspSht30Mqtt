@@ -1,16 +1,18 @@
 #ifdef ESP8266
 #include <ESP8266WiFi.h> // ESP8266 WiFi support.  https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WiFi
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
 #else
 #include <WiFi.h> // Arduino Wi-Fi support.  This header is part of the standard library.  https://www.arduino.cc/en/Reference/WiFi
+#include "ESPmDNS.h"			 // Library for multicast DNS, needed for Over-The-Air updates.
 #endif
 
-#include "Adafruit_SHT31.h" // Driver library for the SHT30.  This library includes Wire.h.
-#include "ESPmDNS.h"			 // Library for multicast DNS, needed for Over-The-Air updates.
-#include "privateInfo.h"	 // Location of Wi-Fi and MQTT settings.
+#include <Adafruit_SHT31.h> // Driver library for the SHT30.  This library includes Wire.h.
 #include <ArduinoJson.h>	 // ArduinoJson by Benoît Blanchon: https://arduinojson.org/
-#include <ArduinoOTA.h>		 // Arduino Over-The-Air updates.
 #include <PubSubClient.h>	 // MQTT client by Nick O'Leary: https://github.com/knolleary/pubsubclient
+#include <ArduinoOTA.h>		 // Arduino Over-The-Air updates.
 #include <WiFiUdp.h>			 // Arduino Over-The-Air updates.
+#include "privateInfo.h"	 // Location of Wi-Fi and MQTT settings.
 
 
 char ipAddress[16];												  // A character array to hold the IP address.
@@ -324,9 +326,17 @@ void configureOTA()
 
 	// Configure the OTA callbacks.
 	ArduinoOTA.onStart( []() {
+#ifdef ESP8266
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH)
+      type = "sketch";
+    else // U_SPIFFS
+      type = "filesystem";
+#else
 		String type = "flash"; // U_FLASH
 		if( ArduinoOTA.getCommand() == U_SPIFFS )
 			type = "filesystem";
+#endif
 		// NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
 		Serial.print( "OTA is updating the " );
 		Serial.println( type );
