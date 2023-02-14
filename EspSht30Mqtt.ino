@@ -1,11 +1,17 @@
 #ifdef ESP8266
 #include <ESP8266WiFi.h> // ESP8266 WiFi support.  https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WiFi
+#include <ESP8266mDNS.h>
+// These two defines accommodate a devkit I have which powers the onboard LED backwards from what is traditional.
+#define LED_ON 0
+#define LED_OFF 1
 #else
-#include <WiFi.h> // Arduino Wi-Fi support.  This header is part of the standard library.  https://www.arduino.cc/en/Reference/WiFi
+#include "ESPmDNS.h" // Library for multicast DNS, needed for Over-The-Air updates.
+#include <WiFi.h>		// Arduino Wi-Fi support.  This header is part of the standard library.  https://www.arduino.cc/en/Reference/WiFi
+#define LED_ON 1
+#define LED_OFF 0
 #endif
 
 #include "Adafruit_SHT31.h" // Driver library for the SHT30.  This library includes Wire.h.
-#include "ESPmDNS.h"			 // Library for multicast DNS, needed for Over-The-Air updates.
 #include "privateInfo.h"	 // Location of Wi-Fi and MQTT settings.
 #include <ArduinoJson.h>	 // ArduinoJson by Benoît Blanchon: https://arduinojson.org/
 #include <ArduinoOTA.h>		 // Arduino Over-The-Air updates.
@@ -131,9 +137,9 @@ float averageArray( float valueArray[] )
 void toggleLED()
 {
 	if( digitalRead( ONBOARD_LED ) != 1 )
-		digitalWrite( ONBOARD_LED, 1 );
+		digitalWrite( ONBOARD_LED, LED_ON );
 	else
-		digitalWrite( ONBOARD_LED, 0 );
+		digitalWrite( ONBOARD_LED, LED_OFF );
 } // End of toggleLED() function.
 
 /**
@@ -249,17 +255,17 @@ void wifiConnect()
 		if( ssidCount == 0 )
 		{
 			Serial.printf( "SSID '%s' is not in range!\n", wifiSsid );
-			digitalWrite( ONBOARD_LED, 0 ); // Turn the LED off to show that Wi-Fi has no chance of connecting.
+			digitalWrite( ONBOARD_LED, LED_OFF ); // Turn the LED off to show that Wi-Fi has no chance of connecting.
 		}
 		else
 		{
 			wifiConnectCount++;
 			// Turn the LED off to show Wi-Fi is not connected.
-			digitalWrite( ONBOARD_LED, 0 );
+			digitalWrite( ONBOARD_LED, LED_OFF );
 
 			Serial.printf( "Attempting to connect to Wi-Fi SSID '%s'", wifiSsid );
 			WiFi.mode( WIFI_STA );
-			WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
+//			WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
 			const char *hostName = macAddress;
 			WiFi.setHostname( hostName );
 			WiFi.begin( wifiSsid, wifiPassword );
@@ -280,7 +286,7 @@ void wifiConnect()
 				Serial.println( "\nWi-Fi connection established!" );
 				snprintf( ipAddress, 16, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3] );
 				// Turn the LED on to show that Wi-Fi is connected.
-				digitalWrite( ONBOARD_LED, 1 );
+				digitalWrite( ONBOARD_LED, LED_ON );
 				return;
 			}
 			else
@@ -304,6 +310,16 @@ void configureOTA()
 	// ArduinoOTA.setHostname( hostName );
 	// Authentication is disabled by default.
 	// ArduinoOTA.setPassword( ( const char * )"admin" );
+	ArduinoOTA.onStart( []() {
+		String type;
+		if( ArduinoOTA.getCommand() == U_FLASH )
+			type = "sketch";
+		else // U_SPIFFS
+			type = "filesystem";
+
+		// NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+		Serial.println( "Start updating " + type );
+	} );
 #else
 	// The ESP32 port defaults to 3232
 	// ArduinoOTA.setPort( 3232 );
@@ -314,7 +330,6 @@ void configureOTA()
 	// Password can be set with it's md5 value as well
 	// MD5( admin ) = 21232f297a57a5a743894a0e4a801fc3
 	// ArduinoOTA.setPasswordHash( "21232f297a57a5a743894a0e4a801fc3" );
-#endif
 
 	//	Serial.printf( "Using hostname '%s'\n", hostName );
 
@@ -331,6 +346,7 @@ void configureOTA()
 		Serial.print( "OTA is updating the " );
 		Serial.println( type );
 	} );
+#endif
 	ArduinoOTA.onEnd( []() { Serial.println( "\nTerminating OTA communication." ); } );
 	ArduinoOTA.onProgress( []( unsigned int progress, unsigned int total ) { Serial.printf( "OTA progress: %u%%\r", ( progress / ( total / 100 ) ) ); } );
 	ArduinoOTA.onError( []( ota_error_t error ) {
@@ -378,6 +394,8 @@ void printTelemetry()
 	{
 		Serial.printf( "  IP address: %s\n", ipAddress );
 		Serial.printf( "  RSSI: %ld\n", rssi );
+		Serial.print( "~~IP address: " );
+		Serial.println( WiFi.localIP() );
 	}
 	Serial.printf( "  wifiConnectCount: %u\n", wifiConnectCount );
 	Serial.printf( "  wifiCoolDownInterval: %lu\n", wifiCoolDownInterval );
@@ -535,7 +553,7 @@ void mqttConnect()
 	if( lastMqttConnectionTime == 0 || ( time > mqttCoolDownInterval && ( time - mqttCoolDownInterval ) > lastMqttConnectionTime ) )
 	{
 		mqttConnectCount++;
-		digitalWrite( ONBOARD_LED, 0 );
+		digitalWrite( ONBOARD_LED, LED_OFF );
 		Serial.printf( "Connecting to broker at %s:%d...\n", mqttBroker, mqttPort );
 		mqttClient.setServer( mqttBroker, mqttPort );
 		mqttClient.setCallback( mqttCallback );
@@ -545,7 +563,7 @@ void mqttConnect()
 		{
 			Serial.println( "Connected to MQTT Broker." );
 			mqttClient.subscribe( commandTopic );
-			digitalWrite( ONBOARD_LED, 1 );
+			digitalWrite( ONBOARD_LED, LED_ON );
 		}
 		else
 		{
@@ -583,7 +601,7 @@ void setup()
 	// Set ONBOARD_LED (GPIO 2) as an output.
 	pinMode( ONBOARD_LED, OUTPUT );
 	// Turn the LED on to show that setup() has begun.
-	digitalWrite( ONBOARD_LED, 1 );
+	digitalWrite( ONBOARD_LED, LED_ON );
 
 	setupSht30();
 
@@ -646,10 +664,10 @@ void loop()
 			if( mqttClient.state() != 0 )
 				toggleLED(); // Toggle the LED state to show that Wi-Fi is connected by MQTT is not.
 			else
-				digitalWrite( ONBOARD_LED, 1 ); // Turn the LED on to show both Wi-Fi and MQTT are connected.
+				digitalWrite( ONBOARD_LED, LED_ON ); // Turn the LED on to show both Wi-Fi and MQTT are connected.
 		}
 		else
-			digitalWrite( ONBOARD_LED, 0 ); // Turn the LED off to show that Wi-Fi is not connected.
+			digitalWrite( ONBOARD_LED, LED_OFF ); // Turn the LED off to show that Wi-Fi is not connected.
 		lastLedBlinkTime = millis();
 	}
 } // End of the loop() function.
