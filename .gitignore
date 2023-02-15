@@ -1,12 +1,7 @@
+cmake-build-*/
 .idea/
 *.iml
 privateInfo.*
 debug_custom.json
 *.svd
-
-.idea/
-cmake-build-debug/
-privateInfo.*
 debug.cfg
-debug_custom.json
-esp32.svd
