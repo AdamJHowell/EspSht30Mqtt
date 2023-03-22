@@ -19,8 +19,8 @@
 #include <WiFiUdp.h>			 // Arduino Over-The-Air updates.
 
 
-char ipAddress[16];												  // A character array to hold the IP address.
-char macAddress[18];												  // A character array to hold the MAC address, and append a dash and 3 numbers.
+char ipAddress[16];												  // A character array to hold the IP address and a null terminator.
+char macAddress[18];												  // A character array to hold the MAC address and a null terminator.
 long rssi;															  // A global to hold the Received Signal Strength Indicator.
 unsigned int printInterval = 7000;							  // How long to wait between telemetry printouts.
 unsigned int publishInterval = 20000;						  // How long to wait between telemetry publishes.
