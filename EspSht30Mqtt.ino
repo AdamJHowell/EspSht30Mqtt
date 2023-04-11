@@ -2,12 +2,12 @@
 #include <ESP8266WiFi.h> // ESP8266 WiFi support.  https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WiFi
 #include <ESP8266mDNS.h>
 // These two defines accommodate a devkit I have which powers the onboard LED backwards from what is traditional.
-#define LED_ON 0
+#define LED_ON	 0
 #define LED_OFF 1
 #else
 #include "ESPmDNS.h" // Library for multicast DNS, needed for Over-The-Air updates.
 #include <WiFi.h>		// Arduino Wi-Fi support.  This header is part of the standard library.  https://www.arduino.cc/en/Reference/WiFi
-#define LED_ON 1
+#define LED_ON	 1
 #define LED_OFF 0
 #endif
 
@@ -28,6 +28,7 @@ unsigned int wifiConnectCount = 0;							  // A counter for how many times the w
 unsigned int mqttConnectCount = 0;							  // A counter for how many times the mqttConnect() function has been called.
 unsigned int invalidValueCount = 0;							  // A counter of how many times invalid values have been measured.
 unsigned int publishNow = 0;									  // A flag to indicate that a publish should happen immediately.
+unsigned int publishFailCount = 0;							  // The number of times a MQTT publish has failed.
 unsigned long printCount = 0;									  // A counter of how many times the stats have been printed.
 unsigned long publishCount = 0;								  // A counter of how many times the stats have been published.
 unsigned long callbackCount = 0;								  // The number of times a callback was received.
@@ -141,6 +142,19 @@ void toggleLED()
 	else
 		digitalWrite( ONBOARD_LED, LED_OFF );
 } // End of toggleLED() function.
+
+
+/**
+ * @brief deviceRestart() will restart the device.
+ */
+void deviceRestart()
+{
+	Serial.println( "Restarting in 5 seconds..." );
+	delay( 5000 );
+	Serial.println( "Restarting the device!" );
+	ESP.restart();
+} // End of the deviceRestart() function.
+
 
 /**
  * @brief lookupWifiCode() will return the string for an integer code.
@@ -265,7 +279,7 @@ void wifiConnect()
 
 			Serial.printf( "Attempting to connect to Wi-Fi SSID '%s'", wifiSsid );
 			WiFi.mode( WIFI_STA );
-//			WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
+			//			WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
 			const char *hostName = macAddress;
 			WiFi.setHostname( hostName );
 			WiFi.begin( wifiSsid, wifiPassword );
@@ -443,7 +457,15 @@ void publishTelemetry()
 	// Publish the JSON to the MQTT broker.
 	bool success = mqttClient.publish( mqttTopic, mqttString, false );
 	if( success )
+	{
 		Serial.printf( "Successfully published to '%s'\n", mqttTopic );
+		publishFailCount = 0;
+	}
+	else
+		publishFailCount++;
+
+	if( publishFailCount > 10 )
+		deviceRestart();
 
 	publishCount++;
 	char topicBuffer[256] = "";
@@ -508,6 +530,7 @@ void publishTelemetry()
 /**
  * @brief mqttCallback() will process incoming messages on subscribed topics.
  * { "command": "publishTelemetry" }
+ * { "command": "restart" }
  * { "command": "changeTelemetryInterval", "value": 10000 }
  * ToDo: Add more commands for the board to react to.
  */
@@ -519,7 +542,8 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 	StaticJsonDocument<JSON_DOC_SIZE> callbackJsonDoc;
 	Serial.println( "JSON document (static) was created." );
 	deserializeJson( callbackJsonDoc, payload, length );
-	Serial.println( "JSON document was deserialized." );
+	Serial.println( "JSON document was deserialized:" );
+	Serial.println( callbackJsonDoc );
 
 	const char *command = callbackJsonDoc["command"];
 	Serial.printf( "Processing command '%s'.\n", command );
@@ -539,6 +563,8 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 	}
 	else if( strcmp( command, "publishStatus" ) == 0 )
 		Serial.println( "publishStatus is not yet implemented." );
+	else if( strcmp( command, "restart" ) == 0 )
+		deviceRestart();
 	else
 		Serial.printf( "Unknown command '%s'\n", command );
 } // End of the mqttCallback() function.
@@ -582,6 +608,7 @@ void mqttConnect()
 		lastMqttConnectionTime = millis();
 	}
 } // End of the mqttConnect() function.
+
 
 /**
  * @brief setup() will configure the program.
@@ -645,6 +672,7 @@ void loop()
 	// Publish only if connected.  Publish the first time.  Avoid subtraction overflow.  Publish every interval.
 	if( mqttClient.connected() && ( publishNow == 1 || lastPublishTime == 0 || ( currentTime > publishInterval && ( currentTime - publishInterval ) > lastPublishTime ) ) )
 	{
+		// If called manually, refresh the telemetry.
 		if( publishNow == 1 )
 			readTelemetry();
 		publishTelemetry();
@@ -662,7 +690,7 @@ void loop()
 		if( WiFi.status() == WL_CONNECTED )
 		{
 			if( mqttClient.state() != 0 )
-				toggleLED(); // Toggle the LED state to show that Wi-Fi is connected by MQTT is not.
+				toggleLED();								 // Toggle the LED state to show that Wi-Fi is connected by MQTT is not.
 			else
 				digitalWrite( ONBOARD_LED, LED_ON ); // Turn the LED on to show both Wi-Fi and MQTT are connected.
 		}
