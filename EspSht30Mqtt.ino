@@ -432,6 +432,14 @@ void printTelemetry()
 	Serial.printf( "  Invalid readings: %u\n", invalidValueCount );
 } // End of the printTelemetry() function.
 
+void publishAndReport( const char *topicBuffer, const char *valueBuffer )
+{
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'.\n", valueBuffer, topicBuffer );
+	else
+		Serial.printf( "!!! Failed to publish '%s' to '%s' !!!\n", valueBuffer, topicBuffer );
+}
+
 /**
  * @brief publishTelemetry() will process incoming messages on subscribed topics.
  */
@@ -471,58 +479,47 @@ void publishTelemetry()
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", tempCTopic );
 	snprintf( valueBuffer, 25, "%f", averageArray( sht30TempCArray ) );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", tempFTopic );
 	snprintf( valueBuffer, 25, "%f", cToF( averageArray( sht30TempCArray ) ) );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", humidityTopic );
 	snprintf( valueBuffer, 25, "%f", averageArray( sht30HumidityArray ) );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", rssiTopic );
 	snprintf( valueBuffer, 25, "%ld", rssi );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", macTopic );
 	snprintf( valueBuffer, 25, "%s", macAddress );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", ipTopic );
 	snprintf( valueBuffer, 25, "%s", ipAddress );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCountTopic );
 	snprintf( valueBuffer, 25, "%u", wifiConnectCount );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCoolDownTopic );
 	snprintf( valueBuffer, 25, "%lu", wifiCoolDownInterval );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCountTopic );
 	snprintf( valueBuffer, 25, "%u", mqttConnectCount );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCoolDownTopic );
 	snprintf( valueBuffer, 25, "%lu", mqttCoolDownInterval );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", publishCountTopic );
 	snprintf( valueBuffer, 25, "%lu", publishCount );
-	if( mqttClient.publish( topicBuffer, valueBuffer ) )
-		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
+	publishAndReport( topicBuffer, valueBuffer );
 } // End of the publishTelemetry() function.
 
 /**
