@@ -532,16 +532,15 @@ void publishTelemetry()
 void mqttCallback( char *topic, byte *payload, unsigned int length )
 {
 	callbackCount++;
-	Serial.printf( "\nMessage arrived on Topic: '%s'\n", topic );
+	Serial.printf( "\nMessage arrived on Topic: '%s':\n", topic );
 
 	StaticJsonDocument<JSON_DOC_SIZE> staticJsonDocument;
-	Serial.println( "JSON document (static) was created." );
 	deserializeJson( staticJsonDocument, payload, length );
-	Serial.println( "JSON document was deserialized" );
 
 	// Print the payload to the serial connection.
 	for( int i = 0; i < length; i++ )
 		Serial.print( ( char ) payload[i] );
+	Serial.println( "\n" );
 
 	const char *command = staticJsonDocument["command"];
 	Serial.printf( "Processing command '%s'.\n", command );
