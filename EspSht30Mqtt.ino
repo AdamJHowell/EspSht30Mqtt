@@ -12,10 +12,10 @@
 #endif
 
 #include "Adafruit_SHT31.h" // Driver library for the SHT30.  This library includes Wire.h.
+#include "PubSubClient.h"	 // MQTT client by Nick O'Leary: https://github.com/knolleary/pubsubclient
 #include "privateInfo.h"	 // Location of Wi-Fi and MQTT settings.
 #include <ArduinoJson.h>	 // ArduinoJson by Benoît Blanchon: https://arduinojson.org/
 #include <ArduinoOTA.h>		 // Arduino Over-The-Air updates.
-#include <PubSubClient.h>	 // MQTT client by Nick O'Leary: https://github.com/knolleary/pubsubclient
 #include <WiFiUdp.h>			 // Arduino Over-The-Air updates.
 
 
@@ -43,7 +43,7 @@ unsigned long ledBlinkInterval = 200;						  // The interval between telemetry p
 unsigned long lastLedBlinkTime = 0;							  // The time of the last telemetry process.
 const unsigned int ONBOARD_LED = 2;							  // The GPIO which the onboard LED is connected to.
 const unsigned int JSON_DOC_SIZE = 512;					  // The ArduinoJson document size.
-const char *commandTopic = "AdamsEspArmada/commands";	  // The topic used to subscribe to update commands.  Commands: publishTelemetry, changeTelemetryInterval, publishStatus.
+const char *commandTopic = "AdamsEspArmada/commands";	  // The topic used to subscribe to update commands.  Commands: publishTelemetry, changeTelemetryInterval, publishStatus, restart.
 const char *topicPrefix = "AdamsEspArmada/";				  // The MQTT topic prefix, which will have suffixes appended to.
 const char *tempCTopic = "sht30/tempC";					  // The MQTT Celsius temperature topic suffix.
 const char *tempFTopic = "sht30/tempF";					  // The MQTT Fahrenheit temperature topic suffix.
@@ -143,7 +143,6 @@ void toggleLED()
 		digitalWrite( ONBOARD_LED, LED_OFF );
 } // End of toggleLED() function.
 
-
 /**
  * @brief deviceRestart() will restart the device.
  */
@@ -154,7 +153,6 @@ void deviceRestart()
 	Serial.println( "Restarting the device!" );
 	ESP.restart();
 } // End of the deviceRestart() function.
-
 
 /**
  * @brief lookupWifiCode() will return the string for an integer code.
@@ -473,58 +471,58 @@ void publishTelemetry()
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", tempCTopic );
 	snprintf( valueBuffer, 25, "%f", averageArray( sht30TempCArray ) );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", tempFTopic );
 	snprintf( valueBuffer, 25, "%f", cToF( averageArray( sht30TempCArray ) ) );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", humidityTopic );
 	snprintf( valueBuffer, 25, "%f", averageArray( sht30HumidityArray ) );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", rssiTopic );
 	snprintf( valueBuffer, 25, "%ld", rssi );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", macTopic );
 	snprintf( valueBuffer, 25, "%s", macAddress );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", ipTopic );
 	snprintf( valueBuffer, 25, "%s", ipAddress );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCountTopic );
 	snprintf( valueBuffer, 25, "%u", wifiConnectCount );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCoolDownTopic );
 	snprintf( valueBuffer, 25, "%lu", wifiCoolDownInterval );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCountTopic );
 	snprintf( valueBuffer, 25, "%u", mqttConnectCount );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCoolDownTopic );
 	snprintf( valueBuffer, 25, "%lu", mqttCoolDownInterval );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 
 	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", publishCountTopic );
 	snprintf( valueBuffer, 25, "%lu", publishCount );
-	Serial.printf( "Publishing '%s' to '%s'\n", valueBuffer, topicBuffer );
-	mqttClient.publish( topicBuffer, valueBuffer );
+	if( mqttClient.publish( topicBuffer, valueBuffer ) )
+		Serial.printf( "Published '%s' to '%s'\n", valueBuffer, topicBuffer );
 } // End of the publishTelemetry() function.
 
 /**
@@ -539,13 +537,16 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 	callbackCount++;
 	Serial.printf( "\nMessage arrived on Topic: '%s'\n", topic );
 
-	StaticJsonDocument<JSON_DOC_SIZE> callbackJsonDoc;
+	StaticJsonDocument<JSON_DOC_SIZE> staticJsonDocument;
 	Serial.println( "JSON document (static) was created." );
-	deserializeJson( callbackJsonDoc, payload, length );
-	Serial.println( "JSON document was deserialized:" );
-	Serial.println( callbackJsonDoc );
+	deserializeJson( staticJsonDocument, payload, length );
+	Serial.println( "JSON document was deserialized" );
 
-	const char *command = callbackJsonDoc["command"];
+	// Print the payload to the serial connection.
+	for( int i = 0; i < length; i++ )
+		Serial.print( ( char ) payload[i] );
+
+	const char *command = staticJsonDocument["command"];
 	Serial.printf( "Processing command '%s'.\n", command );
 	if( strcmp( command, "publishTelemetry" ) == 0 )
 	{
@@ -554,7 +555,7 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
 	}
 	else if( strcmp( command, "changeTelemetryInterval" ) == 0 )
 	{
-		unsigned long tempValue = callbackJsonDoc["value"];
+		unsigned long tempValue = staticJsonDocument["value"];
 		// Only update the value if it is greater than 4 seconds.  This prevents a seconds vs. milliseconds confusion.
 		if( tempValue > 4000 )
 			publishInterval = tempValue;
@@ -588,7 +589,11 @@ void mqttConnect()
 		if( mqttClient.connect( macAddress ) )
 		{
 			Serial.println( "Connected to MQTT Broker." );
-			mqttClient.subscribe( commandTopic );
+			if( mqttClient.subscribe( commandTopic, 1 ) )
+				Serial.print( "Subscribed" );
+			else
+				Serial.print( "Failed to subscribe" );
+			Serial.printf( " to '%s'.\n", commandTopic );
 			digitalWrite( ONBOARD_LED, LED_ON );
 		}
 		else
@@ -608,7 +613,6 @@ void mqttConnect()
 		lastMqttConnectionTime = millis();
 	}
 } // End of the mqttConnect() function.
-
 
 /**
  * @brief setup() will configure the program.
