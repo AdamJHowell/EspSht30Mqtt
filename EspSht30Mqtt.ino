@@ -1,22 +1,22 @@
-#ifdef ESP8266
-#include <ESP8266WiFi.h> // ESP8266 WiFi support.  https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WiFi
-#include <ESP8266mDNS.h>
-// These two defines accommodate a devkit I have which powers the onboard LED backwards from what is traditional.
-#define LED_ON	 0
-#define LED_OFF 1
-#else
-#include "ESPmDNS.h" // Library for multicast DNS, needed for Over-The-Air updates.
-#include <WiFi.h>		// Arduino Wi-Fi support.  This header is part of the standard library.  https://www.arduino.cc/en/Reference/WiFi
-#define LED_ON	 1
-#define LED_OFF 0
-#endif
-
 #include "Adafruit_SHT31.h" // Driver library for the SHT30.  This library includes Wire.h.
 #include "PubSubClient.h"	 // MQTT client by Nick O'Leary: https://github.com/knolleary/pubsubclient
 #include "privateInfo.h"	 // Location of Wi-Fi and MQTT settings.
 #include <ArduinoJson.h>	 // ArduinoJson by Benoît Blanchon: https://arduinojson.org/
 #include <ArduinoOTA.h>		 // Arduino Over-The-Air updates.
 #include <WiFiUdp.h>			 // Arduino Over-The-Air updates.
+
+#ifdef ESP8266
+#include <ESP8266WiFi.h> // ESP8266 WiFi support.  https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WiFi
+#include <ESP8266mDNS.h>
+// These two defines accommodate a devkit I have which powers the onboard LED backwards from what is traditional.
+const unsigned int LED_ON = 0;
+const unsigned int LED_OFF = 1;
+#else
+#include "ESPmDNS.h" // Library for multicast DNS, needed for Over-The-Air updates.
+#include <WiFi.h>		// Arduino Wi-Fi support.  This header is part of the standard library.  https://www.arduino.cc/en/Reference/WiFi
+const unsigned int LED_ON = 1;
+const unsigned int LED_OFF = 0;
+#endif
 
 
 char ipAddress[16];												  // A character array to hold the IP address and a null terminator.
@@ -74,14 +74,14 @@ PubSubClient mqttClient( wifiClient );
  */
 void setupSht30()
 {
-	unsigned int address = 0x44;
+	uint8_t address = 0x44;
 	// Set to 0x45 for alternate i2c address.
 	if( !sht30.begin( address ) )
 	{
 		Serial.printf( "Could not find SHT30 at address %X!\n", address );
 		Serial.println( "  Please fix the problem and reboot the device." );
 		Serial.println( "  This function is now in an infinite loop." );
-		while( 1 )
+		while( true )
 			delay( 1000 );
 	}
 
@@ -97,7 +97,7 @@ void setupSht30()
  */
 float cToF( float value )
 {
-	return value * 1.8 + 32;
+	return ( value * 1.8 ) + 32;
 } // End of the cToF() function.
 
 /**
@@ -277,7 +277,6 @@ void wifiConnect()
 
 			Serial.printf( "Attempting to connect to Wi-Fi SSID '%s'", wifiSsid );
 			WiFi.mode( WIFI_STA );
-			//			WiFi.config( INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE );
 			const char *hostName = macAddress;
 			WiFi.setHostname( hostName );
 			WiFi.begin( wifiSsid, wifiPassword );
@@ -432,19 +431,22 @@ void printTelemetry()
 	Serial.printf( "  Invalid readings: %u\n", invalidValueCount );
 } // End of the printTelemetry() function.
 
-void publishAndReport( const char *topicBuffer, const char *valueBuffer )
+void publishAndReport( const char *topic, const char *valueBuffer )
 {
+	char topicBuffer[256] = "";
+	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", topic );
 	if( mqttClient.publish( topicBuffer, valueBuffer ) )
 		Serial.printf( "Published '%s' to '%s'.\n", valueBuffer, topicBuffer );
 	else
 		Serial.printf( "!!! Failed to publish '%s' to '%s' !!!\n", valueBuffer, topicBuffer );
-}
+} // End of the publishAndReport() function.
 
 /**
  * @brief publishTelemetry() will process incoming messages on subscribed topics.
  */
 void publishTelemetry()
 {
+	char valueBuffer[25] = "";
 	// Create a JSON Document on the stack.
 	StaticJsonDocument<JSON_DOC_SIZE> publishTelemetryJsonDoc;
 	// Add data: __FILE__, macAddress, ipAddress, tempC, tempF, soilMoisture, rssi, publishCount, notes
@@ -465,6 +467,7 @@ void publishTelemetry()
 	if( success )
 	{
 		Serial.printf( "Successfully published to '%s'\n", mqttTopic );
+		publishCount++;
 		publishFailCount = 0;
 	}
 	else
@@ -473,53 +476,39 @@ void publishTelemetry()
 	if( publishFailCount > 10 )
 		deviceRestart();
 
-	publishCount++;
-	char topicBuffer[256] = "";
-	char valueBuffer[25] = "";
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", tempCTopic );
 	snprintf( valueBuffer, 25, "%f", averageArray( sht30TempCArray ) );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( tempCTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", tempFTopic );
 	snprintf( valueBuffer, 25, "%f", cToF( averageArray( sht30TempCArray ) ) );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( tempFTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", humidityTopic );
 	snprintf( valueBuffer, 25, "%f", averageArray( sht30HumidityArray ) );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( humidityTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", rssiTopic );
 	snprintf( valueBuffer, 25, "%ld", rssi );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( rssiTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", macTopic );
 	snprintf( valueBuffer, 25, "%s", macAddress );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( macTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", ipTopic );
 	snprintf( valueBuffer, 25, "%s", ipAddress );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( ipTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCountTopic );
 	snprintf( valueBuffer, 25, "%u", wifiConnectCount );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( wifiCountTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", wifiCoolDownTopic );
 	snprintf( valueBuffer, 25, "%lu", wifiCoolDownInterval );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( wifiCoolDownTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCountTopic );
 	snprintf( valueBuffer, 25, "%u", mqttConnectCount );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( mqttCountTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", mqttCoolDownTopic );
 	snprintf( valueBuffer, 25, "%lu", mqttCoolDownInterval );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( mqttCoolDownTopic, valueBuffer );
 
-	snprintf( topicBuffer, 256, "%s%s%s%s", topicPrefix, macAddress, "/", publishCountTopic );
 	snprintf( valueBuffer, 25, "%lu", publishCount );
-	publishAndReport( topicBuffer, valueBuffer );
+	publishAndReport( publishCountTopic, valueBuffer );
 } // End of the publishTelemetry() function.
 
 /**
@@ -527,7 +516,6 @@ void publishTelemetry()
  * { "command": "publishTelemetry" }
  * { "command": "restart" }
  * { "command": "changeTelemetryInterval", "value": 10000 }
- * ToDo: Add more commands for the board to react to.
  */
 void mqttCallback( char *topic, byte *payload, unsigned int length )
 {
