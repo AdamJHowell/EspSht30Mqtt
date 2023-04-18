@@ -260,8 +260,7 @@ int checkForSSID( const char *ssidName )
  */
 void wifiConnect()
 {
-	long time = millis();
-	if( lastWifiConnectTime == 0 || ( time > wifiCoolDownInterval && ( time - wifiCoolDownInterval ) > lastWifiConnectTime ) )
+	if( lastWifiConnectTime == 0 || millis() - lastWifiConnectTime >= wifiCoolDownInterval )
 	{
 		int ssidCount = checkForSSID( wifiSsid );
 		if( ssidCount == 0 )
@@ -559,9 +558,8 @@ void mqttCallback( char *topic, byte *payload, unsigned int length )
  */
 void mqttConnect()
 {
-	long time = millis();
-	// Connect the first time.  Avoid subtraction overflow.  Connect after cool down.
-	if( lastMqttConnectionTime == 0 || ( time > mqttCoolDownInterval && ( time - mqttCoolDownInterval ) > lastMqttConnectionTime ) )
+	// Connect the first time.  Connect after cool down.
+	if( lastMqttConnectionTime == 0 || millis() - lastMqttConnectionTime > mqttCoolDownInterval )
 	{
 		mqttConnectCount++;
 		digitalWrite( ONBOARD_LED, LED_OFF );
@@ -646,9 +644,8 @@ void loop()
 		ArduinoOTA.handle();
 	}
 
-	long currentTime = millis();
 	// Print the first time.  Avoid subtraction overflow.  Print every interval.
-	if( lastPrintTime == 0 || ( currentTime > printInterval && ( currentTime - printInterval ) > lastPrintTime ) )
+	if( lastPrintTime == 0 || millis() - lastPrintTime >= printInterval )
 	{
 		readTelemetry();
 		printTelemetry();
@@ -656,23 +653,20 @@ void loop()
 		lastPrintTime = millis();
 	}
 
-	currentTime = millis();
-	// Publish only if connected.  Publish the first time.  Avoid subtraction overflow.  Publish every interval.
-	if( mqttClient.connected() && ( publishNow == 1 || lastPublishTime == 0 || ( currentTime > publishInterval && ( currentTime - publishInterval ) > lastPublishTime ) ) )
+	// Publish only if connected.  Publish the first time.  Publish every interval.
+	if( mqttClient.connected() && ( publishNow == 1 || lastPublishTime == 0 || millis() - lastPublishTime >= publishInterval ) )
 	{
 		// If called manually, refresh the telemetry.
 		if( publishNow == 1 )
 			readTelemetry();
 		publishTelemetry();
-		lastPublishTime = millis();
 		publishNow = 0;
 		Serial.printf( "Next publish in %u seconds.\n\n", publishInterval / 1000 );
 		lastPublishTime = millis();
 	}
 
-	currentTime = millis();
-	// Process the first time.  Avoid subtraction overflow.  Process every interval.
-	if( lastLedBlinkTime == 0 || ( ( currentTime > ledBlinkInterval ) && ( currentTime - ledBlinkInterval ) > lastLedBlinkTime ) )
+	// Process the first time.  Process every interval.
+	if( lastLedBlinkTime == 0 || millis() - lastLedBlinkTime >= ledBlinkInterval )
 	{
 		// If Wi-Fi is connected, but MQTT is not, blink the LED.
 		if( WiFi.status() == WL_CONNECTED )
