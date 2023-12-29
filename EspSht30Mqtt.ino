@@ -454,6 +454,7 @@ void publishTelemetry()
 	publishTelemetryJsonDoc["ip"] = ipAddress;
 	publishTelemetryJsonDoc["tempC"] = averageArray( sht30TempCArray );
 	publishTelemetryJsonDoc["tempF"] = cToF( averageArray( sht30TempCArray ) );
+  publishTelemetryJsonDoc["humidity"] = averageArray( sht30HumidityArray );
 	publishTelemetryJsonDoc["rssi"] = rssi;
 	publishTelemetryJsonDoc["publishCount"] = publishCount;
 	publishTelemetryJsonDoc["invalidValueCount"] = invalidValueCount;
