@@ -95,7 +95,7 @@ void setupSht30()
 /**
  * @brief cToF() will convert Celsius to Fahrenheit.
  */
-float cToF( float value )
+float cToF( const float value )
 {
 	return ( value * 1.8 ) + 32;
 } // End of the cToF() function.
@@ -104,7 +104,7 @@ float cToF( float value )
  * @brief addValue() will add the passed value to the passed array, after moving the existing array values to higher indexes.
  * If value is less than minValue, or greater than maxValue, it will be discarded and nothing will be added to valueArray.
  */
-void addValue( float valueArray[], float value, float minValue, float maxValue )
+void addValue( float valueArray[], const float value, const float minValue, const float maxValue )
 {
 	// Prevent sensor anomalies from getting into the array.
 	if( value < minValue || value > maxValue )
@@ -157,7 +157,7 @@ void deviceRestart()
 /**
  * @brief lookupWifiCode() will return the string for an integer code.
  */
-void lookupWifiCode( int code, char *buffer )
+void lookupWifiCode( const int code, char *buffer )
 {
 	switch( code )
 	{
@@ -190,7 +190,7 @@ void lookupWifiCode( int code, char *buffer )
 /**
  * @brief lookupMQTTCode() will return the string for an integer state code.
  */
-void lookupMQTTCode( int code, char *buffer )
+void lookupMQTTCode( const int code, char *buffer )
 {
 	switch( code )
 	{
